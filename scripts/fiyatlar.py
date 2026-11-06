@@ -58,6 +58,7 @@ def tefas():
                 "fontip": tip, "sfontur": "", "fonkod": "", "fongrup": "",
                 "bastarih": bas.strftime("%d.%m.%Y"), "bittarih": bit.strftime("%d.%m.%Y"),
                 "fonturkod": "", "fonunvantip": "", "strperiod": "1,1,1,1,1,1,1", "islemdurum": "1"})
+            out.setdefault("tefas_tani", []).append(f"{tip}: {r.status_code} {r.headers.get('content-type','')} {len(r.text)}b {r.text[:160]!r}")
             veri = r.json().get("data", [])
         except Exception as e:
             out["hata"].append(f"tefas {tip}: {type(e).__name__} {str(e)[:120]}"); continue
