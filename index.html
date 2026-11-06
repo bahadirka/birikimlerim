@@ -104,8 +104,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 25; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 26; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:26, t:"2026-11-07", n:["Hisse eklerken şirket adıyla arama (ör. \"google\" → GOOGL, \"türk hava\" → THYAO)","Listede hisselerin yanında şirket adı görünür"]},
   {s:25, t:"2026-11-07", n:["Yüksek kârlarda (ör. uzun süre tutulan BTC) yanlış \"maliyeti kontrol edin\" uyarısı kaldırıldı; gerçek kâr yüzdesi ve tutarı gösterilir","Düzenleme ekranında girilen maliyetle hesaplanan kâr önizlemesi"]},
   {s:24, t:"2026-11-06", n:["Kripto ve ABD hisselerinde dolar karşılığı (ve 1 coin'in dolar fiyatı) görünür; kategori başlığında dolar toplamı"]},
   {s:23, t:"2026-11-06", n:["Vadeli mevduatta vade sonu net kârı tutar ve yüzde olarak görünür; bugüne kadar işleyen faiz de yazar","Mevduat formunda yıllık net getiri"]},
@@ -774,6 +775,36 @@ function fonFormu(a, v){
     <p class="muted">Tutarı girerseniz pay adedi TEFAS fiyatından hesaplanır; sonra değer her gün kendiliğinden güncellenir. Ayda bir yeni tutarı girmeniz yeterli.</p>`;
 }
 const trKucuk = x => String(x||"").toLocaleLowerCase("tr-TR");
+/* Hisse: adıyla ya da koduyla arama (ör. "google" → GOOGL) */
+function hisseAramaHTML(a){
+  const cf = canliFiyat(a), ad = canli?.adlar?.[a.type]?.[String(a.symbol||"").toUpperCase()];
+  return `<label>Hisse — adıyla ya da koduyla arayın</label>
+    <input id="hisseAra" autocomplete="off" placeholder="${a.type==="abd"?"ör. google, apple, nasdaq":"ör. türk hava, aselsan, garanti"}">
+    <div id="hisseSonuc"></div>
+    <div class="muted" id="hisseAd">${ad?esc(ad):""}${cf?" · "+(a.type==="abd"?"$"+fN.format(cf.p):fN.format(cf.p)+" TL"):""}</div>`;
+}
+document.addEventListener("input", e => {
+  if (e.target.id !== "hisseAra") return;
+  const q = trKucuk(e.target.value).trim(), kutu = document.getElementById("hisseSonuc"); if (!kutu) return;
+  const tip = document.querySelector("#f select[name=type]")?.value;
+  if (q.length < 2) { kutu.innerHTML = ""; return; }
+  if (!canli?.[tip]) { kutu.innerHTML = '<p class="muted">Liste yükleniyor…</p>'; return; }
+  const adlar = canli.adlar?.[tip] || {}, kel = q.split(/\s+/);
+  const sonuc = Object.keys(canli[tip]).map(k=>[k, adlar[k]||""])
+    .filter(([k,ad]) => { const h = trKucuk(k+" "+ad); return kel.every(w=>h.includes(w)); })
+    .sort((x,y)=> (trKucuk(x[0]).startsWith(q)?0:1)-(trKucuk(y[0]).startsWith(q)?0:1)).slice(0, 8);
+  kutu.innerHTML = sonuc.length ? sonuc.map(([k,ad]) => { const p = canli[tip][k]?.p; return `<div class="row tap" data-hissesec="${esc(k)}"><div><b>${esc(k)}</b><div class="muted">${esc(ad)}</div></div><div class="r muted">${p!=null?(tip==="abd"?"$"+fN.format(p):fN.format(p)+" TL"):""}</div></div>`; }).join("")
+    : '<p class="muted">Bulunamadı. Kodu biliyorsanız aşağıya yazın; canlı fiyat için Claude\'a bildirin.</p>';
+});
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-hissesec]"); if (!t) return;
+  const k = t.dataset.hissesec, tip = document.querySelector("#f select[name=type]")?.value;
+  const inp = document.querySelector("#f input[name=symbol]"); if (inp) inp.value = k;
+  const ad = document.getElementById("hisseAd"), p = canli?.[tip]?.[k]?.p;
+  if (ad) ad.textContent = (canli?.adlar?.[tip]?.[k]||k) + (p!=null ? " · "+(tip==="abd"?"$"+fN.format(p):fN.format(p)+" TL") : "");
+  document.getElementById("hisseSonuc").innerHTML = ""; document.getElementById("hisseAra").value = "";
+  document.querySelector("#f input[name=qty]")?.focus();
+});
 document.addEventListener("input", e => {
   if (e.target.id !== "fonAra") return;
   const q = trKucuk(e.target.value).trim(), kutu = document.getElementById("fonSonuc");
@@ -865,6 +896,7 @@ function etiket(a){
   if (a.type==="gumus") return "Gümüş";
   if (a.type==="nakit") return "Nakit · "+a.cur;
   if (isBA(a)) return a.kisi || "";
+  if ((a.type==="bist"||a.type==="abd") && canli?.adlar?.[a.type]?.[String(a.symbol||"").toUpperCase()]) return String(a.symbol).toUpperCase()+" · "+canli.adlar[a.type][String(a.symbol).toUpperCase()];
   if (a.type==="mevduat") return (a.banka||"Vadeli") + (a.cur&&a.cur!=="TRY"?" · "+a.cur:"");
   return String(a.symbol||"").toUpperCase();
 }
@@ -944,8 +976,8 @@ function form(){
     case "gumus": ozel = `<label>Miktar (gram)</label><input name="qty" inputmode="decimal" value="${v("qty")}">`; break;
     case "nakit": ozel = `<label>Para birimi</label>${sel("cur",Object.fromEntries(PARA.map(p=>[p,p])),a.cur)}<label>Tutar</label><input name="qty" inputmode="decimal" value="${v("qty")}">`; break;
     case "kripto": ozel = `<label>Sembol (ör. BTC, ETH, SOL)</label><input name="symbol" autocapitalize="characters" value="${v("symbol")}"><label>Miktar</label><input name="qty" inputmode="decimal" value="${v("qty")}">`; break;
-    case "bist": ozel = `<label>Hisse kodu (ör. THYAO)</label><input name="symbol" autocapitalize="characters" value="${v("symbol")}"><label>Adet</label><input name="qty" inputmode="decimal" value="${v("qty")}"><label>Güncel fiyat (TL) — canlı fiyat bulunursa otomatik kullanılır, bulunmazsa bu</label><input name="manualPrice" inputmode="decimal" value="${v("manualPrice")}">`; break;
-    case "abd": ozel = `<label>Hisse kodu (ör. AAPL)</label><input name="symbol" autocapitalize="characters" value="${v("symbol")}"><label>Adet</label><input name="qty" inputmode="decimal" value="${v("qty")}"><label>Güncel fiyat (USD) — canlı fiyat bulunursa otomatik kullanılır, bulunmazsa bu</label><input name="manualPrice" inputmode="decimal" value="${v("manualPrice")}">`; break;
+    case "bist": ozel = hisseAramaHTML(a) + `<label>Hisse kodu (ör. THYAO)</label><input name="symbol" autocapitalize="characters" value="${v("symbol")}"><label>Adet</label><input name="qty" inputmode="decimal" value="${v("qty")}"><label>Güncel fiyat (TL) — canlı fiyat bulunursa otomatik kullanılır, bulunmazsa bu</label><input name="manualPrice" inputmode="decimal" value="${v("manualPrice")}">`; break;
+    case "abd": ozel = hisseAramaHTML(a) + `<label>Hisse kodu (ör. AAPL, GOOGL)</label><input name="symbol" autocapitalize="characters" value="${v("symbol")}"><label>Adet</label><input name="qty" inputmode="decimal" value="${v("qty")}"><label>Güncel fiyat (USD) — canlı fiyat bulunursa otomatik kullanılır, bulunmazsa bu</label><input name="manualPrice" inputmode="decimal" value="${v("manualPrice")}">`; break;
     case "fon": case "bes": ozel = fonFormu(a, v); break;
     case "mevduat": { const m = mevduatHesap(a); ozel = `<label>Banka</label><input name="banka" value="${v("banka")}" placeholder="ör. Garanti BBVA">
       <label>Hesap / şube notu (isteğe bağlı)</label><input name="hesapNot" value="${v("hesapNot")}" placeholder="ör. Kadıköy şubesi, 32 gün otomatik yenilemeli">
