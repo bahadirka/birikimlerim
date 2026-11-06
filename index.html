@@ -50,6 +50,18 @@ main a{color:var(--acc)}
 .chg{font-size:12px;margin-top:2px;display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline}
 .chg .up,.tick.up{color:var(--pos);font-weight:600}.chg .down,.tick.down{color:var(--neg);font-weight:600}
 .tick{font-size:11px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{background:none;border:0;padding:5px 10px;font:inherit;font-size:12px;color:var(--muted);cursor:pointer}
+.seg button.on{background:var(--acc);color:#fff;font-weight:600}
+.mk{cursor:pointer}
+.gp{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center}
+@media (min-width:600px){.gp{align-items:center}}
+.gp-kart{background:var(--card);width:100%;max-width:480px;border-radius:18px 18px 0 0;padding:14px 16px calc(16px + env(safe-area-inset-bottom))}
+@media (min-width:600px){.gp-kart{border-radius:18px}}
+.gp-ust{display:flex;align-items:center;gap:8px}
+.gp-fiyat{font-size:26px;font-weight:700;margin-top:10px;letter-spacing:-.4px}
+.gp-alt{font-size:13px;min-height:18px;margin-bottom:8px}
+.gp-bos{height:190px;display:flex;align-items:center;justify-content:center;color:var(--muted)}
 .mkgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
 @media (min-width:700px){.mkgrid{grid-template-columns:repeat(3,1fr)}}
 .mk{position:relative;overflow:hidden;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:11px 10px 14px;min-height:104px}
@@ -91,8 +103,10 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 16; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 18; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:18, t:"2026-11-06", n:["Piyasa kartına dokununca büyük grafik açılır: Gün / Hafta / Ay / Yıl","Grafikte parmağınızı gezdirince o anki fiyat, tarih ve değişim görünür"]},
+  {s:17, t:"2026-11-06", n:["Net varlık TL / USD / EUR olarak görülebilir (Özet'teki düğmelerle seçilir, diğer ikisi altında yazar)","Piyasa kartında Bitcoin artık dolar ($) olarak"]},
   {s:16, t:"2026-11-06", n:["Piyasa kartları yenilendi: simge, saat ve yüzde etiketi, büyük fiyat","Her kartta gün içi mini grafik (yükselişte yeşil, düşüşte kırmızı)"]},
   {s:15, t:"2026-11-06", n:["Piyasa bölümü renklendi: günlük yükselen yeşil, düşen kırmızı","Günlük değişim yüzdesi ve son yenilemeden bu yana anlık değişim (↑/↓)","BIST 100, BIST 30, S&P 500 ve Nasdaq endeksleri eklendi"]},
   {s:14, t:"2026-11-06", n:["Ayarlar ayrı sayfada: sağ üstteki ⚙︎ düğmesi","Özet'te renkli dilim grafik; dilime ya da satıra dokununca o kategorinin detayları açılır","Renkler renk körlüğüne uygun, doğrulanmış palete geçirildi"]},
@@ -245,6 +259,11 @@ const sayi = v => { if (v===""||v==null) return null; const n = parseFloat(Strin
 const fTL = new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",maximumFractionDigits:0});
 const fTL2 = new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",maximumFractionDigits:2});
 const fUSD = new Intl.NumberFormat("tr-TR",{style:"currency",currency:"USD",maximumFractionDigits:0});
+const fEUR = new Intl.NumberFormat("tr-TR",{style:"currency",currency:"EUR",maximumFractionDigits:0});
+const fUSD2 = new Intl.NumberFormat("tr-TR",{style:"currency",currency:"USD",maximumFractionDigits:2});
+const PB = {TRY:{ad:"TL", f:()=>fTL, kur:()=>1}, USD:{ad:"USD", f:()=>fUSD, kur:()=>prices.fx.USD}, EUR:{ad:"EUR", f:()=>fEUR, kur:()=>prices.fx.EUR}};
+let gosterPB = (()=>{ try { return localStorage.getItem("gosterPB") || "TRY"; } catch { return "TRY"; } })();
+const pbPara = (v, pb=gosterPB) => { const k = PB[pb].kur(); return (k ? para(v/k, PB[pb].f()) : "—"); };
 const fN = new Intl.NumberFormat("tr-TR",{maximumFractionDigits:8});
 const para = (v, f=fTL) => gizli ? "••••••" : (v==null ? "—" : f.format(v));
 const bugun = () => new Date().toLocaleDateString("sv-SE");
@@ -280,6 +299,7 @@ async function fiyatlariAl(){
     for (const id of all) if (j[id]) prices.crypto[id] = {try:j[id].try, usd:j[id].usd, ch:j[id].try_24h_change};
     prices.ch = prices.ch || {};
     if (j.bitcoin?.try_24h_change!=null) prices.ch.btc = j.bitcoin.try_24h_change;
+    if (j.bitcoin?.usd_24h_change!=null) prices.ch.btcUSD = j.bitcoin.usd_24h_change;
     if (j.tether?.try_24h_change!=null) prices.ch.USD ??= j.tether.try_24h_change;
     if (j["pax-gold"]?.try_24h_change!=null) { prices.ch.gram24 ??= j["pax-gold"].try_24h_change; prices.ch.ceyrek ??= j["pax-gold"].try_24h_change; }
     if (j["kinesis-silver"]?.try_24h_change!=null) prices.ch.gumus ??= j["kinesis-silver"].try_24h_change;
@@ -482,7 +502,7 @@ function piyasaDegerleri(){
     {k:"gram24", l:"Gram altın", ik:"Au", ir:"#eda100", v:prices.gold.gram24, ch:prices.ch?.gram24, seri:sr.GRAM},
     {k:"ceyrek", l:"Çeyrek altın", ik:"¼", ir:"#c98500", v:prices.gold.ceyrek, ch:prices.ch?.ceyrek, f:fTL, seri:sr.GRAM},
     {k:"gumus", l:"Gram gümüş", ik:"Ag", ir:"#9a988f", v:prices.silver.gram, ch:prices.ch?.gumus, seri:sr.GUMUS},
-    {k:"btc", l:"Bitcoin", ik:"₿", ir:"#f7931a", v:prices.crypto.bitcoin?.try, ch:prices.ch?.btc, f:fTL, seri:btcSeri || sr.BTCUSD},
+    {k:"btc", l:"Bitcoin", ik:"₿", ir:"#f7931a", v:prices.crypto.bitcoin?.usd, ch:prices.ch?.btcUSD ?? prices.ch?.btc, f:fUSD2, seri:btcSeri || sr.BTCUSD},
     {k:"USD", l:"Dolar", ik:"$", ir:"#2f9e44", v:prices.fx.USD, ch:prices.ch?.USD, f:fTL4, seri:sr.USD},
     {k:"EUR", l:"Euro", ik:"€", ir:"#2a78d6", v:prices.fx.EUR, ch:prices.ch?.EUR, f:fTL4, seri:sr.EUR},
     {k:"XU100", l:"BIST 100", ik:"100", ir:"#e03131", v:e["XU100.IS"]?.p, ch:e["XU100.IS"]?.ch, f:fN2, seri:sr.XU100},
@@ -496,11 +516,102 @@ let btcSeri = null, btcSeriSon = 0;
 async function btcSeriAl(){
   if (Date.now()-btcSeriSon < 10*60*1000) return;
   btcSeriSon = Date.now();
-  try { const r = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=try&days=1");
+  try { const r = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=1");
     const j = await r.json(); const p = (j.prices||[]).map(x=>x[1]);
     if (p.length > 4) btcSeri = p.filter((_,i)=>i%Math.ceil(p.length/60)===0).concat([p[p.length-1]]);
   } catch {}
 }
+/* ============ Dokununca açılan grafik ============ */
+const GRAFIK_ANAHTAR = {gram24:"GRAM", ceyrek:"GRAM", gumus:"GUMUS", USD:"USD", EUR:"EUR", XU100:"XU100", XU030:"XU030", GSPC:"GSPC", IXIC:"IXIC"};
+const ARALIK = [["gun","Gün"],["hafta","Hafta"],["ay","Ay"],["yil","Yıl"]];
+let grafikDurum = null; // {k, r, t:[], v:[]}
+async function grafikVeri(k, r){
+  if (k==="btc"){
+    const gun = {gun:1, hafta:7, ay:30, yil:365}[r];
+    try { const j = await (await fetch(`https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=${gun}`)).json();
+      let p = j.prices||[]; const adim = Math.ceil(p.length/200); p = p.filter((_,i)=>i%adim===0||i===p.length-1);
+      return {t:p.map(x=>x[0]/1000), v:p.map(x=>x[1])}; } catch { return null; }
+  }
+  const g = canli?.grafik?.[GRAFIK_ANAHTAR[k]]; if (!g) return null;
+  let d = r==="ay" ? (()=>{ const y=g.yil, sinir=Date.now()/1000-31*86400, i=y.t.findIndex(t=>t>=sinir); return {t:y.t.slice(Math.max(0,i)), v:y.v.slice(Math.max(0,i))}; })() : g[r];
+  if (!d || d.v.length<2) return null;
+  const guncel = piyasaDegerleri().find(x=>x.k===k)?.v;
+  if (["gram24","ceyrek","gumus"].includes(k) && guncel) { const o = guncel / d.v[d.v.length-1]; d = {t:d.t, v:d.v.map(x=>x*o)}; }
+  return d;
+}
+async function grafikAc(k, r="gun"){
+  const d0 = piyasaDegerleri().find(x=>x.k===k); if (!d0) return;
+  grafikDurum = {k, r, t:[], v:[], yukleniyor:true}; grafikCiz();
+  const d = await grafikVeri(k, r);
+  if (!grafikDurum || grafikDurum.k!==k || grafikDurum.r!==r) return;
+  grafikDurum = {k, r, ...(d||{t:[],v:[]}), yukleniyor:false}; grafikCiz();
+}
+function grafikKapat(){ grafikDurum=null; document.getElementById("grafikPencere")?.remove(); }
+function grafikCiz(){
+  const G = grafikDurum; if (!G) return;
+  const d0 = piyasaDegerleri().find(x=>x.k===G.k), f = d0.f||fTL2;
+  let w = document.getElementById("grafikPencere");
+  if (!w){ w = document.createElement("div"); w.id="grafikPencere"; w.className="gp"; document.body.appendChild(w); }
+  const v = G.v||[], n = v.length, W=340, H=190, PT=10, PB=22;
+  let govde = "", deg = "";
+  if (G.yukleniyor) govde = `<div class="gp-bos">Yükleniyor…</div>`;
+  else if (n<2) govde = `<div class="gp-bos">Bu aralık için grafik verisi yok.</div>`;
+  else {
+    const mn=Math.min(...v), mx=Math.max(...v), rg=(mx-mn)||1;
+    const X=i=>(i/(n-1))*W, Y=x=>PT+(1-(x-mn)/rg)*(H-PT-PB);
+    const yuz=(v[n-1]/v[0]-1)*100, renk = yuz>=0?"var(--pos)":"var(--neg)";
+    const yol = v.map((x,i)=>(i?"L":"M")+X(i).toFixed(1)+","+Y(x).toFixed(1)).join(" ");
+    deg = `<span class="${yuz>=0?"pos":"neg"}" style="font-weight:700">${yuzde(yuz)}</span> <span class="muted">${{gun:"bugün",hafta:"son 5 gün",ay:"son 1 ay",yil:"son 1 yıl"}[G.r]}</span>`;
+    const tf = ts => { const dt=new Date(ts*1000); return G.r==="gun"||G.r==="hafta" ? dt.toLocaleString("tr-TR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : dt.toLocaleDateString("tr-TR",{day:"2-digit",month:"short",year:G.r==="yil"?"2-digit":undefined}); };
+    govde = `<svg id="gpSvg" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;touch-action:none;display:block">
+      <line x1="0" x2="${W}" y1="${Y(mx)}" y2="${Y(mx)}" stroke="var(--line)" stroke-dasharray="3 4"/>
+      <line x1="0" x2="${W}" y1="${Y(mn)}" y2="${Y(mn)}" stroke="var(--line)" stroke-dasharray="3 4"/>
+      <path d="${yol} L${W},${H-PB} L0,${H-PB} Z" fill="${renk}" opacity=".10"/>
+      <path d="${yol}" fill="none" stroke="${renk}" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+      <text x="${W-2}" y="${Y(mx)+12}" text-anchor="end" font-size="10" fill="var(--muted)" paint-order="stroke" stroke="var(--card)" stroke-width="3">${f.format(mx)}</text>
+      <text x="${W-2}" y="${Y(mn)-4}" text-anchor="end" font-size="10" fill="var(--muted)" paint-order="stroke" stroke="var(--card)" stroke-width="3">${f.format(mn)}</text>
+      <text x="0" y="${H-6}" font-size="10" fill="var(--muted)">${tf(G.t[0])}</text>
+      <text x="${W}" y="${H-6}" text-anchor="end" font-size="10" fill="var(--muted)">${tf(G.t[n-1])}</text>
+      <g id="gpImlec" style="display:none"><line id="gpCizgi" y1="${PT}" y2="${H-PB}" stroke="var(--muted)" stroke-width="1"/><circle id="gpNokta" r="4" fill="${renk}" stroke="var(--card)" stroke-width="2"/></g>
+      <rect x="0" y="0" width="${W}" height="${H}" fill="transparent" id="gpAlan"/></svg>`;
+    G._X=X; G._Y=Y; G._tf=tf; G._W=W;
+  }
+  w.innerHTML = `<div class="gp-kart" role="dialog" aria-label="${esc(d0.l)} grafiği">
+    <div class="gp-ust"><span class="mk-ik" style="background:${d0.ir}">${d0.ik}</span><b style="flex:1">${esc(d0.l)}</b><button class="iconbtn" data-gp="kapat" aria-label="Kapat">✕</button></div>
+    <div class="gp-fiyat" id="gpFiyat">${d0.v==null?"—":f.format(d0.v)}</div>
+    <div class="gp-alt" id="gpAlt">${deg||"&nbsp;"}</div>
+    ${govde}
+    <div class="seg" style="display:flex;margin-top:10px">${ARALIK.map(([k,l])=>`<button style="flex:1" data-gp="${k}" class="${G.r===k?"on":""}">${l}</button>`).join("")}</div>
+    ${["gram24","ceyrek","gumus"].includes(G.k)?'<p class="muted" style="font-size:11px;margin:8px 0 0">Eğri dünya ons fiyatı × dolar kurundan çizilir; seviye bugünkü fiyata göre ayarlanır.</p>':""}
+    ${["XU100","XU030","GSPC","IXIC","USD","EUR"].includes(G.k)?'<p class="muted" style="font-size:11px;margin:8px 0 0">Veri yaklaşık 15 dk gecikmeli; yarım saatte bir güncellenir.</p>':""}
+  </div>`;
+  const alan = document.getElementById("gpAlan");
+  if (alan){
+    const goster = ev => {
+      const svg = document.getElementById("gpSvg"), r = svg.getBoundingClientRect();
+      const x = ((ev.touches?ev.touches[0].clientX:ev.clientX) - r.left) / r.width * G._W;
+      const i = Math.max(0, Math.min(n-1, Math.round(x/G._W*(n-1))));
+      document.getElementById("gpImlec").style.display="";
+      const cx=G._X(i), cy=G._Y(v[i]);
+      document.getElementById("gpCizgi").setAttribute("x1",cx); document.getElementById("gpCizgi").setAttribute("x2",cx);
+      document.getElementById("gpNokta").setAttribute("cx",cx); document.getElementById("gpNokta").setAttribute("cy",cy);
+      document.getElementById("gpFiyat").textContent = f.format(v[i]);
+      const y=(v[i]/v[0]-1)*100;
+      document.getElementById("gpAlt").innerHTML = `<span class="muted">${G._tf(G.t[i])}</span> · <span class="${y>=0?"pos":"neg"}">${yuzde(y)}</span>`;
+    };
+    const birak = () => { document.getElementById("gpImlec").style.display="none"; document.getElementById("gpFiyat").textContent = d0.v==null?"—":f.format(d0.v); document.getElementById("gpAlt").innerHTML = deg; };
+    alan.addEventListener("pointermove", goster); alan.addEventListener("pointerdown", goster);
+    alan.addEventListener("pointerleave", birak); alan.addEventListener("pointerup", e=>{ if (e.pointerType!=="mouse") birak(); });
+  }
+}
+document.addEventListener("click", e => {
+  if (e.target.id==="grafikPencere") return grafikKapat();
+  const b = e.target.closest("[data-gp]");
+  if (b){ e.stopPropagation(); return b.dataset.gp==="kapat" ? grafikKapat() : grafikAc(grafikDurum.k, b.dataset.gp); }
+  const m = e.target.closest("[data-mk]"); if (m) grafikAc(m.dataset.mk);
+}, true);
+document.addEventListener("keydown", e => { if (e.key==="Escape" && grafikDurum) grafikKapat(); });
+
 function kivilcim(seri, yon){
   if (!seri || seri.length < 3) return "";
   const mn = Math.min(...seri), mx = Math.max(...seri), rg = (mx-mn) || 1, W=160, H=48;
@@ -529,7 +640,7 @@ function fiyatSeridi(){
     const ch = d.ch, cls = ch==null ? "" : ch>0 ? "up" : ch<0 ? "down" : "";
     const a = anlik[d.k], taze = a && Date.now()-a.t < 70000;
     const zs = saat(d);
-    return `<div class="mk ${taze?(a.yon>0?" flash-up":" flash-down"):""}">
+    return `<div class="mk ${taze?(a.yon>0?" flash-up":" flash-down"):""}" data-mk="${d.k}" role="button" tabindex="0">
       ${kivilcim(d.seri, ch)}
       <div class="mk-ust">
         <span class="mk-ik" style="background:${d.ir}">${d.ik}</span>
@@ -561,11 +672,13 @@ function ozet(){
   const sira = Object.entries(grup).sort((a,b)=>b[1]-a[1]);
   return `${fidOneri()}
   <div class="card">
-    <div class="muted">Net varlık</div>
-    <div class="big">${para(t.net)}</div>
-    ${(t.alacak||t.borc)?`<div class="muted">Varlıklar ${para(t.varlik)} · Alacak <span class="pos">+${para(t.alacak)}</span> · Borç <span class="neg">−${para(t.borc)}</span></div>`:""}
-    <div class="muted">${prices.fx.USD?`≈ ${para(t.net/prices.fx.USD,fUSD)}`:""}
-      ${t.kz!=null?` · <span class="${t.kz>=0?"pos":"neg"}">${gizli?"••••":(t.kz>=0?"+":"")+fTL.format(t.kz)+" ("+t.kzOran.toFixed(1)+"%)"}</span> <span class="muted">(maliyeti girilenler)</span>`:""}</div>
+    <div style="display:flex;justify-content:space-between;align-items:center"><div class="muted">Net varlık</div>
+      <div class="seg">${Object.keys(PB).map(k=>`<button data-pb="${k}" class="${gosterPB===k?"on":""}">${PB[k].ad}</button>`).join("")}</div></div>
+    <div class="big">${pbPara(t.net)}</div>
+    <div class="muted">${Object.keys(PB).filter(k=>k!==gosterPB).map(k=>"≈ "+pbPara(t.net,k)).join(" · ")}</div>
+    ${(t.alacak||t.borc)?`<div class="muted">Varlıklar ${pbPara(t.varlik)} · Alacak <span class="pos">+${pbPara(t.alacak)}</span> · Borç <span class="neg">−${pbPara(t.borc)}</span></div>`:""}
+    <div class="muted">
+      ${t.kz!=null?`<span class="${t.kz>=0?"pos":"neg"}">${gizli?"••••":(t.kz>=0?"+":"")+fTL.format(t.kz)+" ("+t.kzOran.toFixed(1)+"%)"}</span> <span class="muted">(maliyeti girilenler)</span>`:""}</div>
     ${t.eksik?`<p class="muted">${t.eksik} varlığın fiyatı yok, toplama katılmadı.</p>`:""}
   </div>
   ${sira.length?`<div class="card">${pasta(grup, top)}</div>`:`<div class="card"><p class="muted">Henüz varlık yok. "Ekle"den başlayın.</p></div>`}
@@ -822,6 +935,8 @@ function formOku(){
 
 /* ============ Olaylar ============ */
 document.addEventListener("click", async e => {
+  const pbb = e.target.closest("[data-pb]");
+  if (pbb){ gosterPB = pbb.dataset.pb; try { localStorage.setItem("gosterPB", gosterPB); } catch {} render(); return; }
   const kat = e.target.closest("[data-kat]");
   if (kat && screen==="app"){ filtre = kat.dataset.kat; tab="varlik"; render(); window.scrollTo(0,0); return; }
   const t = e.target.closest("[data-act],[data-tab],[data-edit],[data-yeni]"); if (!t) return;
