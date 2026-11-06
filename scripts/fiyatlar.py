@@ -132,6 +132,7 @@ except Exception as e:
 # Eski /api/DB/* adresleri kapandı; yenisi JSON alır, tarih YYYYMMDD, satırlar "resultList" altında.
 TEFAS_URLLER = ["https://www.tefas.gov.tr/api/funds/fonGnlBlgSiraliGetirDosya",
                 "https://fonturkey.com.tr/api/funds/fonGnlBlgSiraliGetirDosya"]
+gecmis = {}
 def tefas():
     import requests
     h = {"Accept": "application/json, text/javascript, */*; q=0.01", "Content-Type": "application/json",
@@ -164,11 +165,16 @@ def tefas():
             except Exception: fiyat = 0
             tarih = str(d.get("tarih", ""))[:10]
             if not kod or fiyat <= 0: continue
+            gecmis.setdefault(kod, {})[tarih] = fiyat
             onceki = out["fon"].get(kod)
             if onceki is None or tarih >= onceki["t"]:
                 out["fon"][kod] = {"p": fiyat, "t": tarih, "ad": str(d.get("fonUnvan", ""))[:80], "tip": tip}
 
 tefas()
+for kod, g in gecmis.items():  # günlük değişim: son iki fiyat günü
+    tarihler = sorted(g)
+    if len(tarihler) >= 2 and kod in out["fon"] and g[tarihler[-2]]:
+        out["fon"][kod]["ch"] = round((g[tarihler[-1]] / g[tarihler[-2]] - 1) * 100, 4)
 
 # ---------- TCMB döviz kurları (fon fiyatlaması bu kurlarla yapılır) ----------
 def tcmb():
