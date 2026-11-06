@@ -163,6 +163,38 @@ def tefas():
 
 tefas()
 
+# ---------- TCMB döviz kurları (fon fiyatlaması bu kurlarla yapılır) ----------
+def tcmb():
+    import requests, xml.etree.ElementTree as ET
+    out["tcmb"] = {}
+    gun = dt.date.today()
+    for _ in range(14):
+        url = ("https://www.tcmb.gov.tr/kurlar/today.xml" if gun == dt.date.today()
+               else f"https://www.tcmb.gov.tr/kurlar/{gun:%Y%m}/{gun:%d%m%Y}.xml")
+        try:
+            r = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
+            if r.status_code == 200 and b"<Tarih_Date" in r.content:
+                kok = ET.fromstring(r.content)
+                tarih = kok.get("Date")  # MM/DD/YYYY
+                ay, g, yil = tarih.split("/")
+                kayit = {}
+                for c in kok.findall("Currency"):
+                    kod = c.get("CurrencyCode")
+                    if kod in ("USD", "EUR", "GBP"):
+                        def f(tag):
+                            try: return float(c.findtext(tag))
+                            except Exception: return None
+                        kayit[kod] = {"da": f("ForexBuying"), "ds": f("ForexSelling"), "ea": f("BanknoteBuying"), "es": f("BanknoteSelling")}
+                out["tcmb"][f"{yil}-{ay}-{g}"] = kayit
+        except Exception as e:
+            out["hata"].append(f"tcmb {gun}: {type(e).__name__}")
+        gun -= dt.timedelta(days=1)
+        if len(out["tcmb"]) >= 7: break
+try:
+    tcmb()
+except Exception as e:
+    out["hata"].append(f"tcmb: {e}")
+
 out["say"] = {k: len(out[k]) for k in ("bist", "abd", "fon")}
 Path(sys.argv[1] if len(sys.argv) > 1 else "prices.json").write_text(
     json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
