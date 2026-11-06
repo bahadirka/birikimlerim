@@ -64,8 +64,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 11; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 12; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:12, t:"2026-11-06", n:["Fon ve BES eklerken fonu adıyla arama (ör. \"AgeSA hisse\")","Pay adedi yerine bugünkü TL tutarı girilebilir; pay adedi TEFAS fiyatından hesaplanır ve değer her gün güncellenir"]},
   {s:11, t:"2026-11-06", n:["Face ID ile açma: kasa parolası yazmadan tek dokunuşla açılır (her cihazda bir kez etkinleştirilir)","Şifreleme aynen korunur; kasa parolası yedek olarak geçerli"]},
   {s:10, t:"2026-11-06", n:["Vadeli mevduat: banka, anapara, faiz oranı, başlangıç ve vade tarihi, stopaj","Brüt/net faiz, vade sonu tutarı ve işlemiş faizle bugünkü değer otomatik hesaplanır; bankanın verdiği vade sonu tutarı da girilebilir","Vadesine 7 gün kalan ve vadesi dolan mevduatlarda uyarı"]},
   {s:9, t:"2026-11-06", n:["Canlı fiyatlar: BIST ve ABD hisseleri (~15 dk gecikmeli, yarım saatte bir), TEFAS yatırım ve BES fonları (günlük)","Canlı fiyatı olan varlıklarda \"canlı\" etiketi ve günlük değişim; bulunamayanlarda elle fiyat kullanılmaya devam eder"]},
@@ -199,7 +200,8 @@ const TYPES = {
 };
 const isBA = a => a.type==="alacak" || a.type==="borc";
 const ALTIN = {gram24:"Gram (24 ayar)", gram22:"Gram (22 ayar)", ceyrek:"Çeyrek", yarim:"Yarım", tam:"Tam", cumhuriyet:"Cumhuriyet", ons:"Ons"};
-const KONUM = {kasa:"Özel kasa", banka:"Banka", araci:"Aracı kurum", borsa:"Kripto borsası", diger:"Diğer"};
+const KONUM = {kasa:"Özel kasa", banka:"Banka", araci:"Aracı kurum", emeklilik:"Emeklilik şirketi", borsa:"Kripto borsası", diger:"Diğer"};
+const VARSAYILAN_KONUM = {altin:"kasa", gumus:"kasa", nakit:"kasa", bist:"araci", abd:"araci", fon:"araci", bes:"emeklilik", kripto:"borsa", mevduat:"banka"};
 const PARA = ["TRY","USD","EUR","GBP"];
 const CG = {BTC:"bitcoin",ETH:"ethereum",USDT:"tether",USDC:"usd-coin",BNB:"binancecoin",SOL:"solana",XRP:"ripple",ADA:"cardano",DOGE:"dogecoin",AVAX:"avalanche-2",DOT:"polkadot",TRX:"tron",LINK:"chainlink",LTC:"litecoin",TON:"the-open-network",SHIB:"shiba-inu",POL:"polygon-ecosystem-token",MATIC:"polygon-ecosystem-token",ATOM:"cosmos",XLM:"stellar"};
 const cgId = s => CG[String(s||"").toUpperCase()] || String(s||"").toLowerCase().trim();
@@ -464,6 +466,46 @@ function ozet(){
   ${demo?"":ayarlar()}`;
 }
 
+/* Fon / BES formu: adıyla arama + pay adedi YA DA bugünkü TL tutarı */
+function fonFormu(a, v){
+  const cf = canliFiyat(a), bes = a.type==="bes";
+  const deger = degerTL(a);
+  return `<label>${bes?"BES fonu":"Yatırım fonu"} — adıyla ya da koduyla arayın</label>
+    <input id="fonAra" autocomplete="off" placeholder="${bes?"ör. AgeSA hisse, AgeSA altın":"ör. altın, para piyasası, AFA"}" value="">
+    <div id="fonSonuc"></div>
+    <label>Fon kodu</label><input name="symbol" autocapitalize="characters" value="${v("symbol")}">
+    <div class="muted" id="fonAd">${cf?.ad?esc(cf.ad)+" · "+fN.format(cf.p)+" TL ("+esc(cf.t||"")+")":""}</div>
+    <label>Bugünkü tutarı (TL) — ${bes?"AgeSA'da":"hesabınızda"} gördüğünüz değer</label>
+    <input name="tutar" inputmode="decimal" value="" placeholder="${deger!=null&&a.id?"şu an: "+fN.format(Math.round(deger))+" TL":"ör. 125000"}">
+    <details style="margin-top:10px"${(a.qty&&!cf)?" open":""}><summary class="muted" style="cursor:pointer">Pay adedini biliyorum / elle fiyat</summary>
+      <label>Pay adedi</label><input name="qty" inputmode="decimal" value="${v("qty")}">
+      <label>Birim pay fiyatı — TEFAS fiyatı bulunursa otomatik (TL) kullanılır, bulunmazsa bu</label><div style="display:flex;gap:8px"><input name="manualPrice" inputmode="decimal" value="${v("manualPrice")}" style="flex:2"><select style="flex:1" name="fiyatCur">${["TRY","USD","EUR"].map(c=>`<option value="${c}" ${(a.fiyatCur||"TRY")===c?"selected":""}>${c==="TRY"?"TL":c}</option>`).join("")}</select></div>
+    </details>
+    <p class="muted">Tutarı girerseniz pay adedi TEFAS fiyatından hesaplanır; sonra değer her gün kendiliğinden güncellenir. Ayda bir yeni tutarı girmeniz yeterli.</p>`;
+}
+const trKucuk = x => String(x||"").toLocaleLowerCase("tr-TR");
+document.addEventListener("input", e => {
+  if (e.target.id !== "fonAra") return;
+  const q = trKucuk(e.target.value).trim(), kutu = document.getElementById("fonSonuc");
+  if (!kutu) return;
+  if (q.length < 2 || !canli?.fon) { kutu.innerHTML = q.length>=2 && !canli?.fon ? '<p class="muted">Fon listesi yükleniyor…</p>' : ""; return; }
+  const tip = document.querySelector("#f select[name=type]")?.value;
+  const kelimeler = q.split(/\s+/);
+  const sonuc = Object.entries(canli.fon)
+    .filter(([k,f]) => (tip==="bes" ? f.tip==="EMK" : f.tip!=="EMK"))
+    .filter(([k,f]) => { const h = trKucuk(k+" "+f.ad); return kelimeler.every(w=>h.includes(w)); })
+    .slice(0, 8);
+  kutu.innerHTML = sonuc.length ? sonuc.map(([k,f]) => `<div class="row tap" data-fonsec="${esc(k)}"><div><b>${esc(k)}</b><div class="muted">${esc(f.ad)}</div></div><div class="r muted">${fN.format(f.p)}</div></div>`).join("") : '<p class="muted">Bulunamadı.</p>';
+});
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-fonsec]"); if (!t) return;
+  const k = t.dataset.fonsec, f = canli?.fon?.[k], inp = document.querySelector("#f input[name=symbol]");
+  if (inp) inp.value = k;
+  const ad = document.getElementById("fonAd"); if (ad && f) ad.textContent = `${f.ad} · ${fN.format(f.p)} TL (${f.t||""})`;
+  document.getElementById("fonSonuc").innerHTML = ""; document.getElementById("fonAra").value = "";
+  document.querySelector("#f input[name=tutar]")?.focus();
+});
+
 function fidOneri(){
   if (demo || !fidDestek() || fidHazir()) return "";
   if (lsGet("fidOneriGizle:"+kasaId) === "1") return "";
@@ -542,7 +584,7 @@ function miktar(a){
   if (a.type==="altin") return q+" adet/gr";
   if (a.type==="gumus") return q+" gr";
   if (a.type==="nakit") return q+" "+a.cur;
-  if (a.type==="fon" || a.type==="bes") return q+" pay";
+  if (a.type==="fon" || a.type==="bes") return new Intl.NumberFormat("tr-TR",{maximumFractionDigits:2}).format(+a.qty||0)+" pay";
   if (a.type==="mevduat"){
     const m = mevduatHesap(a), c = a.cur==="TRY"||!a.cur ? " TL" : " "+a.cur;
     const v = m.kalan==null ? "" : m.kalan<0 ? ` · <span class="neg">vade ${-m.kalan} gün önce doldu</span>` : m.kalan===0 ? ` · <span class="neg">vade bugün</span>` : m.kalan<=7 ? ` · <span class="neg">vadeye ${m.kalan} gün</span>` : ` · vadeye ${m.kalan} gün`;
@@ -613,8 +655,7 @@ function form(){
     case "kripto": ozel = `<label>Sembol (ör. BTC, ETH, SOL)</label><input name="symbol" autocapitalize="characters" value="${v("symbol")}"><label>Miktar</label><input name="qty" inputmode="decimal" value="${v("qty")}">`; break;
     case "bist": ozel = `<label>Hisse kodu (ör. THYAO)</label><input name="symbol" autocapitalize="characters" value="${v("symbol")}"><label>Adet</label><input name="qty" inputmode="decimal" value="${v("qty")}"><label>Güncel fiyat (TL) — canlı fiyat bulunursa otomatik kullanılır, bulunmazsa bu</label><input name="manualPrice" inputmode="decimal" value="${v("manualPrice")}">`; break;
     case "abd": ozel = `<label>Hisse kodu (ör. AAPL)</label><input name="symbol" autocapitalize="characters" value="${v("symbol")}"><label>Adet</label><input name="qty" inputmode="decimal" value="${v("qty")}"><label>Güncel fiyat (USD) — canlı fiyat bulunursa otomatik kullanılır, bulunmazsa bu</label><input name="manualPrice" inputmode="decimal" value="${v("manualPrice")}">`; break;
-    case "fon": ozel = `<label>Yatırım fonu kodu (TEFAS, ör. AFA)</label><input name="symbol" autocapitalize="characters" value="${v("symbol")}"><label>Pay adedi</label><input name="qty" inputmode="decimal" value="${v("qty")}"><label>Birim pay fiyatı — TEFAS fiyatı bulunursa otomatik (TL) kullanılır, bulunmazsa bu</label><div style="display:flex;gap:8px"><input name="manualPrice" inputmode="decimal" value="${v("manualPrice")}" style="flex:2"><select style="flex:1" name="fiyatCur">${["TRY","USD","EUR"].map(c=>`<option value="${c}" ${(a.fiyatCur||"TRY")===c?"selected":""}>${c==="TRY"?"TL":c}</option>`).join("")}</select></div>`; break;
-    case "bes": ozel = `<label>BES fon kodu (TEFAS'ta yazan kod)</label><input name="symbol" autocapitalize="characters" value="${v("symbol")}"><label>Pay adedi</label><input name="qty" inputmode="decimal" value="${v("qty")}"><label>Birim pay fiyatı — TEFAS fiyatı bulunursa otomatik (TL) kullanılır, bulunmazsa bu</label><div style="display:flex;gap:8px"><input name="manualPrice" inputmode="decimal" value="${v("manualPrice")}" style="flex:2"><select style="flex:1" name="fiyatCur">${["TRY","USD","EUR"].map(c=>`<option value="${c}" ${(a.fiyatCur||"TRY")===c?"selected":""}>${c==="TRY"?"TL":c}</option>`).join("")}</select></div>`; break;
+    case "fon": case "bes": ozel = fonFormu(a, v); break;
     case "mevduat": { const m = mevduatHesap(a); ozel = `<label>Banka</label><input name="banka" value="${v("banka")}" placeholder="ör. Garanti BBVA">
       <label>Hesap / şube notu (isteğe bağlı)</label><input name="hesapNot" value="${v("hesapNot")}" placeholder="ör. Kadıköy şubesi, 32 gün otomatik yenilemeli">
       <label>Anapara</label><div style="display:flex;gap:8px"><input name="qty" inputmode="decimal" value="${v("qty")}" style="flex:2"><select style="flex:1" name="cur">${["TRY","USD","EUR","GBP"].map(c=>`<option value="${c}" ${(a.cur||"TRY")===c?"selected":""}>${c==="TRY"?"TL":c}</option>`).join("")}</select></div>
@@ -729,12 +770,23 @@ document.addEventListener("click", async e => {
   } catch(ex){ t.disabled=false; err(hataMetni(ex)); }
 });
 document.addEventListener("change", e => {
-  if (e.target.form?.id==="f" && e.target.name==="type"){ draft = {...formOku(), type:e.target.value}; render(); }
+  if (e.target.form?.id==="f" && e.target.name==="type"){ const eskiTip = draft?.type, o = formOku(); if (!o.id && (!o.konum || o.konum===VARSAYILAN_KONUM[eskiTip])) o.konum = VARSAYILAN_KONUM[e.target.value] || o.konum; draft = {...o, type:e.target.value}; render(); }
 });
 document.addEventListener("submit", async e => {
   if (e.target.id!=="f") return; e.preventDefault();
   const o = formOku();
   o.qty = sayi(o.qty); o.cost = sayi(o.cost); if ("manualPrice" in o) o.manualPrice = sayi(o.manualPrice);
+  if (o.type==="fon" || o.type==="bes") {
+    o.symbol = String(o.symbol||"").trim().toUpperCase();
+    const tutar = sayi(o.tutar); delete o.tutar;
+    if (tutar && tutar > 0) {
+      const cf = canliFiyat(o), mp = o.manualPrice, k = kurTL(o.fiyatCur);
+      const birim = cf ? cf.p : (mp && k ? mp*k : null);
+      if (birim) o.qty = tutar / birim;
+      else { o.qty = 1; o.manualPrice = tutar; o.fiyatCur = "TRY"; }
+      o.tutarTarih = bugun();
+    }
+  }
   if (!o.qty || o.qty<=0) return toast(isBA(o)?"Tutar girin":"Miktar girin");
   if (o.type==="mevduat") {
     if (!String(o.banka||"").trim()) return toast("Banka adını girin");
