@@ -7,10 +7,17 @@ KOK = Path(__file__).resolve().parent.parent
 out = {"guncel": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
        "bist": {}, "abd": {}, "fon": {}, "hata": []}
 
+out["adlar"] = {}
 def liste(dosya):
     p = KOK / "scripts" / dosya
-    return sorted({l.strip().upper() for l in p.read_text(encoding="utf-8").splitlines()
-                   if l.strip() and not l.startswith("#")})
+    kodlar, adlar = set(), {}
+    for l in p.read_text(encoding="utf-8").splitlines():
+        if not l.strip() or l.startswith("#"): continue
+        kod, _, ad = l.partition("|")
+        kod = kod.strip().upper(); kodlar.add(kod)
+        if ad.strip(): adlar[kod] = ad.strip()
+    out["adlar"][dosya.split(".")[0]] = adlar
+    return sorted(kodlar)
 
 # ---------- Hisseler (Yahoo, ~15 dk gecikmeli) ----------
 def hisseler(semboller, ek, hedef):

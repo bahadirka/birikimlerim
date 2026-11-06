@@ -1,121 +1,121 @@
-# BIST hisse kodları (".IS" eklenmeden). Listede olmayan kodu Claude'a yazın.
-AEFES
-AGHOL
-AKBNK
-AKSA
-AKSEN
-ALARK
-ALFAS
-ANHYT
-ANSGR
-ARCLK
-ASELS
-ASTOR
-BERA
-BIMAS
-BRSAN
-BRYAT
-CCOLA
-CIMSA
-CWENE
-DOAS
-DOHOL
-EGEEN
-EKGYO
-ENERY
-ENJSA
-ENKAI
-EREGL
-EUPWR
-FROTO
-GARAN
-GESAN
-GUBRF
-HALKB
-HEKTS
-ISCTR
-ISMEN
-KCHOL
-KLSER
-KONTR
-KOZAA
-KOZAL
-KRDMD
-LMKDK
-MAVI
-MGROS
-MIATK
-ODAS
-OTKAR
-OYAKC
-PASEU
-PETKM
-PGSUS
-QUAGR
-REEDR
-SAHOL
-SASA
-SISE
-SKBNK
-SMRTG
-SOKM
-TABGD
-TAVHL
-TCELL
-THYAO
-TKFEN
-TOASO
-TSKB
-TTKOM
-TTRAK
-TUPRS
-TURSG
-ULKER
-VAKBN
-VESBE
-VESTL
-YKBNK
-ZOREN
-AGESA
-AKCNS
-ALBRK
-ANELE
-AYGAZ
-BAGFS
-BIOEN
-BUCIM
-CANTE
-CEMTS
-CLEBI
-DEVA
-ECILC
-EGEPO
-ENSRI
-GLYHO
-GOZDE
-GSDHO
-IPEKE
-ISDMR
-ISGYO
-IZMDC
-KARSN
-KARTN
-KERVT
-KORDS
-LOGO
-MPARK
-NTHOL
-NUHCM
-OYYAT
-PRKAB
-SELEC
-SNGYO
-TATGD
-TMSN
-TRGYO
-TUKAS
-ULUUN
-VERUS
-YATAS
-YEOTK
-ZRGYO
+# BIST hisse kodları: KOD | Ad (".IS" eklenmeden). Listede olmayanı Claude'a yazın.
+AEFES | Anadolu Efes
+AGHOL | Anadolu Grubu Holding
+AKBNK | Akbank
+AKSA | Aksa Akrilik
+AKSEN | Aksa Enerji
+ALARK | Alarko Holding
+ALFAS | Alfa Solar
+ANHYT | Anadolu Hayat Emeklilik
+ANSGR | Anadolu Sigorta
+ARCLK | Arçelik
+ASELS | Aselsan
+ASTOR | Astor Enerji
+BERA | Bera Holding
+BIMAS | BİM Mağazalar
+BRSAN | Borusan Boru
+BRYAT | Borusan Yatırım
+CCOLA | Coca-Cola İçecek
+CIMSA | Çimsa
+CWENE | CW Enerji
+DOAS | Doğuş Otomotiv
+DOHOL | Doğan Holding
+EGEEN | Ege Endüstri
+EKGYO | Emlak Konut GYO
+ENERY | Enerya Enerji
+ENJSA | Enerjisa
+ENKAI | Enka İnşaat
+EREGL | Ereğli Demir Çelik
+EUPWR | Europower Enerji
+FROTO | Ford Otosan
+GARAN | Garanti BBVA
+GESAN | Girişim Elektrik
+GUBRF | Gübre Fabrikaları
+HALKB | Halkbank
+HEKTS | Hektaş
+ISCTR | İş Bankası (C)
+ISMEN | İş Yatırım
+KCHOL | Koç Holding
+KLSER | Kaleseramik
+KONTR | Kontrolmatik
+KOZAA | Koza Madencilik
+KOZAL | Koza Altın
+KRDMD | Kardemir (D)
+LMKDK | Limak Doğu Anadolu Çimento
+MAVI | Mavi Giyim
+MGROS | Migros
+MIATK | Mia Teknoloji
+ODAS | Odaş Elektrik
+OTKAR | Otokar
+OYAKC | Oyak Çimento
+PASEU | Pasifik Eurasia
+PETKM | Petkim
+PGSUS | Pegasus
+QUAGR | Qua Granite
+REEDR | Reeder Teknoloji
+SAHOL | Sabancı Holding
+SASA | Sasa Polyester
+SISE | Şişecam
+SKBNK | Şekerbank
+SMRTG | Smart Güneş
+SOKM | Şok Marketler
+TABGD | TAB Gıda (Burger King)
+TAVHL | TAV Havalimanları
+TCELL | Turkcell
+THYAO | Türk Hava Yolları
+TKFEN | Tekfen Holding
+TOASO | Tofaş
+TSKB | TSKB
+TTKOM | Türk Telekom
+TTRAK | Türk Traktör
+TUPRS | Tüpraş
+TURSG | Türkiye Sigorta
+ULKER | Ülker
+VAKBN | VakıfBank
+VESBE | Vestel Beyaz Eşya
+VESTL | Vestel
+YKBNK | Yapı Kredi
+ZOREN | Zorlu Enerji
+AGESA | AgeSA Hayat ve Emeklilik
+AKCNS | Akçansa
+ALBRK | Albaraka Türk
+ANELE | Anel Elektrik
+AYGAZ | Aygaz
+BAGFS | Bagfaş
+BIOEN | Biotrend Enerji
+BUCIM | Bursa Çimento
+CANTE | Çan2 Termik
+CEMTS | Çemtaş
+CLEBI | Çelebi Hava Servisi
+DEVA | Deva Holding
+ECILC | Eczacıbaşı İlaç
+EGEPO | Egepol
+ENSRI | Ensari Deri
+GLYHO | Global Yatırım Holding
+GOZDE | Gözde Girişim
+GSDHO | GSD Holding
+IPEKE | İpek Doğal Enerji
+ISDMR | İskenderun Demir Çelik
+ISGYO | İş GYO
+IZMDC | İzmir Demir Çelik
+KARSN | Karsan
+KARTN | Kartonsan
+KERVT | Kerevitaş
+KORDS | Kordsa
+LOGO | Logo Yazılım
+MPARK | MLP Sağlık (Medical Park)
+NTHOL | Net Holding
+NUHCM | Nuh Çimento
+OYYAT | Oyak Yatırım
+PRKAB | Türk Prysmian Kablo
+SELEC | Selçuk Ecza
+SNGYO | Sinpaş GYO
+TATGD | Tat Gıda
+TMSN | Tümosan
+TRGYO | Torunlar GYO
+TUKAS | Tukaş
+ULUUN | Ulusoy Un
+VERUS | Verusa Holding
+YATAS | Yataş
+YEOTK | Yeo Teknoloji
+ZRGYO | Ziraat GYO

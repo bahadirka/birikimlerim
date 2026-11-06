@@ -1,60 +1,75 @@
-# ABD hisse / ETF kodları. Listede olmayan kodu Claude'a yazın.
-AAPL
-MSFT
-NVDA
-AMZN
-GOOGL
-GOOG
-META
-TSLA
-AVGO
-BRK-B
-JPM
-V
-MA
-NFLX
-AMD
-INTC
-ORCL
-CRM
-ADBE
-COST
-PEP
-KO
-WMT
-DIS
-NKE
-MCD
-PLTR
-COIN
-MSTR
-UBER
-SHOP
-QCOM
-TSM
-ASML
-BABA
-PYPL
-JNJ
-PFE
-LLY
-UNH
-XOM
-CVX
-SPY
-VOO
-IVV
-VTI
-QQQ
-QQQM
-DIA
-IWM
-VT
-VXUS
-SCHD
-GLD
-SLV
-TLT
-ARKK
-SMH
-SOXX
+# ABD hisse / ETF kodları: KOD | Ad. Listede olmayanı Claude'a yazın.
+AAPL | Apple
+MSFT | Microsoft
+NVDA | NVIDIA
+AMZN | Amazon
+GOOGL | Alphabet (Google) A
+GOOG | Alphabet (Google) C
+META | Meta (Facebook, Instagram)
+TSLA | Tesla
+AVGO | Broadcom
+BRK-B | Berkshire Hathaway B
+JPM | JPMorgan Chase
+V | Visa
+MA | Mastercard
+NFLX | Netflix
+AMD | AMD
+INTC | Intel
+ORCL | Oracle
+CRM | Salesforce
+ADBE | Adobe
+COST | Costco
+PEP | PepsiCo
+KO | Coca-Cola
+WMT | Walmart
+DIS | Disney
+NKE | Nike
+MCD | McDonald's
+PLTR | Palantir
+COIN | Coinbase
+MSTR | MicroStrategy (Strategy)
+UBER | Uber
+SHOP | Shopify
+QCOM | Qualcomm
+TSM | TSMC
+ASML | ASML
+BABA | Alibaba
+PYPL | PayPal
+JNJ | Johnson & Johnson
+PFE | Pfizer
+LLY | Eli Lilly
+UNH | UnitedHealth
+XOM | ExxonMobil
+CVX | Chevron
+NVO | Novo Nordisk
+ABNB | Airbnb
+SBUX | Starbucks
+BA | Boeing
+GE | General Electric
+IBM | IBM
+CSCO | Cisco
+MU | Micron
+ARM | Arm Holdings
+SMCI | Super Micro Computer
+SNOW | Snowflake
+SPOT | Spotify
+RIVN | Rivian
+NIO | NIO
+SPY | SPDR S&P 500 ETF
+VOO | Vanguard S&P 500 ETF
+IVV | iShares Core S&P 500 ETF
+VTI | Vanguard Total Stock Market ETF
+QQQ | Invesco QQQ (Nasdaq 100) ETF
+QQQM | Invesco Nasdaq 100 ETF
+DIA | SPDR Dow Jones ETF
+IWM | iShares Russell 2000 ETF
+VT | Vanguard Total World ETF
+VXUS | Vanguard Total International ETF
+SCHD | Schwab US Dividend ETF
+GLD | SPDR Gold (Altın) ETF
+SLV | iShares Silver (Gümüş) ETF
+TLT | iShares 20+ Yıl ABD Tahvil ETF
+ARKK | ARK Innovation ETF
+SMH | VanEck Semiconductor ETF
+SOXX | iShares Semiconductor ETF
+IBIT | iShares Bitcoin ETF
