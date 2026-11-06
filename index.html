@@ -103,8 +103,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 19; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 20; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:20, t:"2026-11-06", n:["Kripto: konum \"Kripto borsası\" seçilince hangi borsa olduğu seçilebilir (Binance, BtcTurk, Paribu ve diğerleri); listede görünür"]},
   {s:19, t:"2026-11-06", n:["Döviz fonları: fon ve BES eklerken tutar USD ya da EUR olarak girilebilir; listede döviz karşılığı da görünür"]},
   {s:18, t:"2026-11-06", n:["Piyasa kartına dokununca büyük grafik açılır: Gün / Hafta / Ay / Yıl","Grafikte parmağınızı gezdirince o anki fiyat, tarih ve değişim görünür"]},
   {s:17, t:"2026-11-06", n:["Net varlık TL / USD / EUR olarak görülebilir (Özet'teki düğmelerle seçilir, diğer ikisi altında yazar)","Piyasa kartında Bitcoin artık dolar ($) olarak"]},
@@ -250,6 +251,7 @@ const renkOf = k => (matchMedia("(prefers-color-scheme: dark)").matches ? TYPES[
 let filtre = null; // Varlıklar'da tek kategori
 const ALTIN = {gram24:"Gram (24 ayar)", gram22:"Gram (22 ayar)", ceyrek:"Çeyrek", yarim:"Yarım", tam:"Tam", cumhuriyet:"Cumhuriyet", ons:"Ons"};
 const KONUM = {kasa:"Özel kasa", banka:"Banka", araci:"Aracı kurum", emeklilik:"Emeklilik şirketi", borsa:"Kripto borsası", diger:"Diğer"};
+const BORSALAR = ["Binance","BtcTurk","Paribu","OKX","Bybit","Coinbase","Kraken","Bitget","Donanım cüzdanı (Ledger, Trezor…)","Diğer"];
 const VARSAYILAN_KONUM = {altin:"kasa", gumus:"kasa", nakit:"kasa", bist:"araci", abd:"araci", fon:"araci", bes:"emeklilik", kripto:"borsa", mevduat:"banka"};
 const PARA = ["TRY","USD","EUR","GBP"];
 const CG = {BTC:"bitcoin",ETH:"ethereum",USDT:"tether",USDC:"usd-coin",BNB:"binancecoin",SOL:"solana",XRP:"ripple",ADA:"cardano",DOGE:"dogecoin",AVAX:"avalanche-2",DOT:"polkadot",TRX:"tron",LINK:"chainlink",LTC:"litecoin",TON:"the-open-network",SHIB:"shiba-inu",POL:"polygon-ecosystem-token",MATIC:"polygon-ecosystem-token",ATOM:"cosmos",XLM:"stellar"};
@@ -847,7 +849,7 @@ function satir(a){
   const cf = canliFiyat(a), elle = !cf && ["bist","abd","fon","bes"].includes(a.type);
   return `<div class="row tap" data-edit="${esc(a.id)}">
     <div><div>${esc(etiket(a))}${a.konum==="kasa"?'<span class="tag">kasa</span>':""}</div>
-    <div class="muted">${miktar(a)}${cf?` · <span class="pos">canlı</span> ${a.type==="abd"?"$"+fN.format(cf.p):fN.format(cf.p)+" TL"}${cf.ch!=null?` <span class="${cf.ch>=0?"pos":"neg"}">${cf.ch>=0?"+":""}${cf.ch}%</span>`:""}${a.type==="fon"||a.type==="bes"?" · "+esc(cf.t||""):""}`:""}${elle?` · elle fiyat${a.fiyatCur&&a.fiyatCur!=="TRY"?" ("+a.fiyatCur+")":""}${a.priceDate?" · "+esc(a.priceDate):""}`:""}${a.konumNot?" · "+esc(a.konumNot):""}</div></div>
+    <div class="muted">${miktar(a)}${cf?` · <span class="pos">canlı</span> ${a.type==="abd"?"$"+fN.format(cf.p):fN.format(cf.p)+" TL"}${cf.ch!=null?` <span class="${cf.ch>=0?"pos":"neg"}">${cf.ch>=0?"+":""}${cf.ch}%</span>`:""}${a.type==="fon"||a.type==="bes"?" · "+esc(cf.t||""):""}`:""}${elle?` · elle fiyat${a.fiyatCur&&a.fiyatCur!=="TRY"?" ("+a.fiyatCur+")":""}${a.priceDate?" · "+esc(a.priceDate):""}`:""}${a.konum==="borsa"&&a.borsaAd?" · "+esc(a.borsaAd):""}${a.konumNot?" · "+esc(a.konumNot):""}</div></div>
     <div class="r"><div>${para(d)}</div>${(a.tutarCur&&a.tutarCur!=="TRY"&&d!=null&&kurTL(a.tutarCur))?`<div class="muted">≈ ${para(d/kurTL(a.tutarCur), a.tutarCur==="USD"?fUSD:fEUR)}</div>`:""}${kz!=null?`<div class="muted ${kz>=0?"pos":"neg"}">${gizli?"":(kz>=0?"+":"")+kz.toFixed(1)+"%"}</div>`:""}</div>
   </div>`;
 }
@@ -924,6 +926,7 @@ function form(){
     <label>Tür</label>${sel("type",Object.fromEntries(Object.entries(TYPES).map(([k,t])=>[k,t.ad])),a.type)}
     ${ozel}
     ${ba?"":`<label>Nerede duruyor?</label>${sel("konum",KONUM,a.konum)}
+    ${a.konum==="borsa"?`<label>Hangi borsa / cüzdan?</label><select name="borsaAd">${BORSALAR.map(b=>`<option value="${esc(b)}" ${(a.borsaAd||"Binance")===b?"selected":""}>${esc(b)}</option>`).join("")}</select>`:""}
     <label>Konum notu (ör. "çelik kasa", "Garanti hesabı")</label><input name="konumNot" value="${v("konumNot")}">
     <label>Toplam maliyet (isteğe bağlı — kâr/zarar için)</label><div style="display:flex;gap:8px"><input name="cost" inputmode="decimal" value="${v("cost")}" style="flex:2"><select style="flex:1" name="costCur">${["TRY","USD","EUR"].map(c=>`<option value="${c}" ${(a.costCur||"TRY")===c?"selected":""}>${c==="TRY"?"TL":c}</option>`).join("")}</select></div>
     <label>Alış tarihi</label><input name="date" type="date" value="${v("date")}">`}
@@ -1025,6 +1028,7 @@ document.addEventListener("click", async e => {
   } catch(ex){ t.disabled=false; err(hataMetni(ex)); }
 });
 document.addEventListener("change", e => {
+  if (e.target.form?.id==="f" && e.target.name==="konum"){ draft = formOku(); render(); return; }
   if (e.target.form?.id==="f" && e.target.name==="type"){ const eskiTip = draft?.type, o = formOku(); if (!o.id && (!o.konum || o.konum===VARSAYILAN_KONUM[eskiTip])) o.konum = VARSAYILAN_KONUM[e.target.value] || o.konum; draft = {...o, type:e.target.value}; render(); }
 });
 document.addEventListener("submit", async e => {
