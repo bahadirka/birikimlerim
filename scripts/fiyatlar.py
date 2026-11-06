@@ -42,39 +42,45 @@ try:
 except Exception as e:
     out["hata"].append(f"hisse: {e}")
 
-# ---------- TEFAS (yatırım + emeklilik fonları, günlük) ----------
+# ---------- TEFAS (yatırım + emeklilik + borsa yatırım fonları, günlük) ----------
+# Eski /api/DB/* adresleri kapandı; yenisi JSON alır, tarih YYYYMMDD, satırlar "resultList" altında.
+TEFAS_URLLER = ["https://www.tefas.gov.tr/api/funds/fonGnlBlgSiraliGetirDosya",
+                "https://fonturkey.com.tr/api/funds/fonGnlBlgSiraliGetirDosya"]
 def tefas():
     import requests
-    s = requests.Session()
-    s.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36",
-                      "Referer": "https://www.tefas.gov.tr/TarihselVeriler.aspx",
-                      "X-Requested-With": "XMLHttpRequest", "Origin": "https://www.tefas.gov.tr"})
-    try: s.get("https://www.tefas.gov.tr/TarihselVeriler.aspx", timeout=30)
-    except Exception: pass
-    bit = dt.date.today(); bas = bit - dt.timedelta(days=7)
+    h = {"Accept": "application/json, text/javascript, */*; q=0.01", "Content-Type": "application/json",
+         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"}
+    bit = dt.date.today(); bas = bit - dt.timedelta(days=10)
     for tip in ("YAT", "EMK", "BYF"):
-        try:
-            r = s.post("https://www.tefas.gov.tr/api/DB/BindHistoryInfo", timeout=60, data={
-                "fontip": tip, "sfontur": "", "fonkod": "", "fongrup": "",
-                "bastarih": bas.strftime("%d.%m.%Y"), "bittarih": bit.strftime("%d.%m.%Y"),
-                "fonturkod": "", "fonunvantip": "", "strperiod": "1,1,1,1,1,1,1", "islemdurum": "1"})
-            out.setdefault("tefas_tani", []).append(f"{tip}: {r.status_code} {r.headers.get('content-type','')} {len(r.text)}b {r.text[:160]!r}")
-            veri = r.json().get("data", [])
-        except Exception as e:
-            out["hata"].append(f"tefas {tip}: {type(e).__name__} {str(e)[:120]}"); continue
-        for d in veri:
-            kod = str(d.get("FONKODU", "")).upper(); fiyat = d.get("FIYAT")
-            try: tarih = int(str(d.get("TARIH")))
-            except Exception: tarih = 0
-            if not kod or not fiyat: continue
+        govde = {"dil": "TR", "fonTipi": tip, "sfonTurKod": None, "fonKod": None, "fonGrup": None,
+                 "basTarih": bas.strftime("%Y%m%d"), "bitTarih": bit.strftime("%Y%m%d"),
+                 "fonTurKod": None, "fonUnvanTip": None, "kurucuKod": None, "fonTurAciklama": None}
+        satirlar = []
+        for url in TEFAS_URLLER:
+            for deneme in range(3):
+                time.sleep(2)
+                try:
+                    r = requests.post(url, json=govde, timeout=60, headers={**h, "Referer": url.split("/api/")[0] + "/"})
+                    if r.status_code == 200:
+                        satirlar = r.json().get("resultList") or []
+                        if satirlar: break
+                    else:
+                        out["hata"].append(f"tefas {tip} {url.split('/')[2]}: HTTP {r.status_code}")
+                except Exception as e:
+                    out["hata"].append(f"tefas {tip} {url.split('/')[2]}: {type(e).__name__}")
+                time.sleep(10)
+            if satirlar: break
+        if not satirlar:
+            out["hata"].append(f"tefas {tip}: boş"); continue
+        for d in satirlar:
+            kod = str(d.get("fonKodu", "")).upper().strip()
+            try: fiyat = float(d.get("fiyat") or 0)
+            except Exception: fiyat = 0
+            tarih = str(d.get("tarih", ""))[:10]
+            if not kod or fiyat <= 0: continue
             onceki = out["fon"].get(kod)
-            if onceki is None or tarih >= onceki["_ts"]:
-                out["fon"][kod] = {"p": float(fiyat), "_ts": tarih,
-                                   "ad": str(d.get("FONUNVAN", ""))[:80], "tip": tip}
-        time.sleep(1)
-    for v in out["fon"].values():
-        ts = v.pop("_ts", 0)
-        if ts: v["t"] = dt.datetime.utcfromtimestamp(ts / 1000).date().isoformat()
+            if onceki is None or tarih >= onceki["t"]:
+                out["fon"][kod] = {"p": fiyat, "t": tarih, "ad": str(d.get("fonUnvan", ""))[:80], "tip": tip}
 
 tefas()
 
