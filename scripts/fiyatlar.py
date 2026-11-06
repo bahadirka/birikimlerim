@@ -44,6 +44,40 @@ try:
 except Exception as e:
     out["hata"].append(f"hisse: {e}")
 
+# ---------- Gün içi mini grafik serileri (15 dk) ----------
+SERI = {"XU100": "XU100.IS", "XU030": "XU030.IS", "GSPC": "^GSPC", "IXIC": "^IXIC",
+        "USD": "USDTRY=X", "EUR": "EURTRY=X", "ONS": "GC=F", "AGONS": "SI=F", "BTCUSD": "BTC-USD"}
+def seriler():
+    import yfinance as yf
+    out["seri"] = {}
+    try:
+        df = yf.download(list(SERI.values()), period="5d", interval="15m", group_by="ticker",
+                         progress=False, threads=True, auto_adjust=False)
+    except Exception as e:
+        out["hata"].append(f"seri: {e}"); return
+    for k, t in SERI.items():
+        try:
+            c = df[t]["Close"].dropna()
+            if c.empty: continue
+            son_gun = c.index[-1].date()
+            g = c[[i.date() == son_gun for i in c.index]]
+            if len(g) < 4: g = c.iloc[-32:]
+            out["seri"][k] = [round(float(x), 4) for x in g.tolist()][-60:]
+        except Exception:
+            pass
+    usd, ons = out["seri"].get("USD"), out["seri"].get("ONS")
+    if usd and ons:  # gram altın TL eğrisi ≈ ons($) × dolar / 31,1035
+        n = min(len(usd), len(ons))
+        out["seri"]["GRAM"] = [round(o * u / 31.1035, 2) for o, u in zip(ons[-n:], usd[-n:])]
+    ag = out["seri"].get("AGONS")
+    if usd and ag:
+        n = min(len(usd), len(ag))
+        out["seri"]["GUMUS"] = [round(o * u / 31.1035, 3) for o, u in zip(ag[-n:], usd[-n:])]
+try:
+    seriler()
+except Exception as e:
+    out["hata"].append(f"seri: {e}")
+
 # ---------- TEFAS (yatırım + emeklilik + borsa yatırım fonları, günlük) ----------
 # Eski /api/DB/* adresleri kapandı; yenisi JSON alır, tarih YYYYMMDD, satırlar "resultList" altında.
 TEFAS_URLLER = ["https://www.tefas.gov.tr/api/funds/fonGnlBlgSiraliGetirDosya",
