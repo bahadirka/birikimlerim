@@ -50,6 +50,21 @@ main a{color:var(--acc)}
 .chg{font-size:12px;margin-top:2px;display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline}
 .chg .up,.tick.up{color:var(--pos);font-weight:600}.chg .down,.tick.down{color:var(--neg);font-weight:600}
 .tick{font-size:11px}
+.mkgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media (min-width:700px){.mkgrid{grid-template-columns:repeat(3,1fr)}}
+.mk{position:relative;overflow:hidden;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:11px 10px 14px;min-height:104px}
+.mk .spark{position:absolute;left:0;right:0;bottom:0;width:100%;height:44%;pointer-events:none}
+.mk-ust{position:relative;display:flex;align-items:flex-start;gap:6px}
+.mk-ik{flex:none;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:10.5px;letter-spacing:-.4px}
+.mk-ad{flex:1;min-width:0;font-weight:600;font-size:13px;line-height:1.15;overflow-wrap:break-word}
+.mk-ad small{display:block;font-size:10px;font-weight:500;color:var(--muted);margin-top:1px}
+.mk-pill{flex:none;display:flex;align-items:center;border-radius:9px;padding:3px 5px;font-size:11.5px;font-weight:700;background:var(--bg);color:var(--muted);line-height:1.2}
+.mk-pill small{font-size:10px;font-weight:500;color:var(--muted)}
+.mk-pill.up{background:color-mix(in srgb,var(--pos) 16%,transparent);color:var(--pos)}
+.mk-pill.down{background:color-mix(in srgb,var(--neg) 16%,transparent);color:var(--neg)}
+.mk-fiyat{position:relative;font-size:19px;font-weight:700;margin-top:10px;letter-spacing:-.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mk-anlik{position:relative;font-size:11px;font-weight:600;margin-top:2px}
+.mk-anlik.up{color:var(--pos)}.mk-anlik.down{color:var(--neg)}
 @keyframes fu{0%{box-shadow:0 0 0 2px var(--pos)}100%{box-shadow:0 0 0 0 transparent}}
 @keyframes fd{0%{box-shadow:0 0 0 2px var(--neg)}100%{box-shadow:0 0 0 0 transparent}}
 .flash-up{animation:fu 1.6s ease-out 2}.flash-down{animation:fd 1.6s ease-out 2}
@@ -76,8 +91,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 15; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 16; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:16, t:"2026-11-06", n:["Piyasa kartları yenilendi: simge, saat ve yüzde etiketi, büyük fiyat","Her kartta gün içi mini grafik (yükselişte yeşil, düşüşte kırmızı)"]},
   {s:15, t:"2026-11-06", n:["Piyasa bölümü renklendi: günlük yükselen yeşil, düşen kırmızı","Günlük değişim yüzdesi ve son yenilemeden bu yana anlık değişim (↑/↓)","BIST 100, BIST 30, S&P 500 ve Nasdaq endeksleri eklendi"]},
   {s:14, t:"2026-11-06", n:["Ayarlar ayrı sayfada: sağ üstteki ⚙︎ düğmesi","Özet'te renkli dilim grafik; dilime ya da satıra dokununca o kategorinin detayları açılır","Renkler renk körlüğüne uygun, doğrulanmış palete geçirildi"]},
   {s:13, t:"2026-11-06", n:["Açılışta Google oturumu hatırlanıyor: oturum yüklenirken artık giriş ekranı gösterilmiyor","Giriş yaparken hesap seçme ekranı her seferinde sorulmuyor"]},
@@ -461,19 +477,39 @@ function acEkrani(){
 /* Piyasa: günlük % (yeşil/kırmızı) + anlık yön (son yenilemeden bu yana ▲/▼) */
 const sonDeger = {}, anlik = {};
 function piyasaDegerleri(){
-  const e = canli?.endeks || {};
+  const e = canli?.endeks || {}, sr = canli?.seri || {};
   return [
-    {k:"gram24", l:"Gram altın", v:prices.gold.gram24, ch:prices.ch?.gram24},
-    {k:"ceyrek", l:"Çeyrek altın", v:prices.gold.ceyrek, ch:prices.ch?.ceyrek, f:fTL},
-    {k:"gumus", l:"Gram gümüş", v:prices.silver.gram, ch:prices.ch?.gumus},
-    {k:"btc", l:"Bitcoin", v:prices.crypto.bitcoin?.try, ch:prices.ch?.btc, f:fTL},
-    {k:"USD", l:"Dolar", v:prices.fx.USD, ch:prices.ch?.USD, f:fTL4},
-    {k:"EUR", l:"Euro", v:prices.fx.EUR, ch:prices.ch?.EUR, f:fTL4},
-    {k:"XU100", l:"BIST 100", v:e["XU100.IS"]?.p, ch:e["XU100.IS"]?.ch, f:fN2},
-    {k:"XU030", l:"BIST 30", v:e["XU030.IS"]?.p, ch:e["XU030.IS"]?.ch, f:fN2},
-    {k:"GSPC", l:"S&P 500", v:e["^GSPC"]?.p, ch:e["^GSPC"]?.ch, f:fN2},
-    {k:"IXIC", l:"Nasdaq", v:e["^IXIC"]?.p, ch:e["^IXIC"]?.ch, f:fN2},
+    {k:"gram24", l:"Gram altın", ik:"Au", ir:"#eda100", v:prices.gold.gram24, ch:prices.ch?.gram24, seri:sr.GRAM},
+    {k:"ceyrek", l:"Çeyrek altın", ik:"¼", ir:"#c98500", v:prices.gold.ceyrek, ch:prices.ch?.ceyrek, f:fTL, seri:sr.GRAM},
+    {k:"gumus", l:"Gram gümüş", ik:"Ag", ir:"#9a988f", v:prices.silver.gram, ch:prices.ch?.gumus, seri:sr.GUMUS},
+    {k:"btc", l:"Bitcoin", ik:"₿", ir:"#f7931a", v:prices.crypto.bitcoin?.try, ch:prices.ch?.btc, f:fTL, seri:btcSeri || sr.BTCUSD},
+    {k:"USD", l:"Dolar", ik:"$", ir:"#2f9e44", v:prices.fx.USD, ch:prices.ch?.USD, f:fTL4, seri:sr.USD},
+    {k:"EUR", l:"Euro", ik:"€", ir:"#2a78d6", v:prices.fx.EUR, ch:prices.ch?.EUR, f:fTL4, seri:sr.EUR},
+    {k:"XU100", l:"BIST 100", ik:"100", ir:"#e03131", v:e["XU100.IS"]?.p, ch:e["XU100.IS"]?.ch, f:fN2, seri:sr.XU100},
+    {k:"XU030", l:"BIST 30", ik:"30", ir:"#c92a2a", v:e["XU030.IS"]?.p, ch:e["XU030.IS"]?.ch, f:fN2, seri:sr.XU030},
+    {k:"GSPC", l:"S&P 500", ik:"500", ir:"#364fc7", v:e["^GSPC"]?.p, ch:e["^GSPC"]?.ch, f:fN2, seri:sr.GSPC},
+    {k:"IXIC", l:"Nasdaq", ik:"NQ", ir:"#1864ab", v:e["^IXIC"]?.p, ch:e["^IXIC"]?.ch, f:fN2, seri:sr.IXIC},
   ];
+}
+/* Bitcoin 24 saatlik eğri (CoinGecko), 10 dakikada bir */
+let btcSeri = null, btcSeriSon = 0;
+async function btcSeriAl(){
+  if (Date.now()-btcSeriSon < 10*60*1000) return;
+  btcSeriSon = Date.now();
+  try { const r = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=try&days=1");
+    const j = await r.json(); const p = (j.prices||[]).map(x=>x[1]);
+    if (p.length > 4) btcSeri = p.filter((_,i)=>i%Math.ceil(p.length/60)===0).concat([p[p.length-1]]);
+  } catch {}
+}
+function kivilcim(seri, yon){
+  if (!seri || seri.length < 3) return "";
+  const mn = Math.min(...seri), mx = Math.max(...seri), rg = (mx-mn) || 1, W=160, H=48;
+  const pts = seri.map((v,i)=>[(i/(seri.length-1))*W, H-4-((v-mn)/rg)*(H-10)]);
+  const d = pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ");
+  const renk = yon<0 ? "var(--neg)" : yon>0 ? "var(--pos)" : "var(--muted)";
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+    <path d="${d} L${W},${H} L0,${H} Z" fill="${renk}" opacity=".10"/>
+    <path d="${d}" fill="none" stroke="${renk}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" opacity=".55"/></svg>`;
 }
 function anlikHesapla(){
   for (const d of piyasaDegerleri()){
@@ -487,17 +523,24 @@ const fTL4 = new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",mini
 const fN2 = new Intl.NumberFormat("tr-TR",{maximumFractionDigits:2});
 const yuzde = (x,ond=2) => (x>0?"+":x<0?"−":"")+"%"+new Intl.NumberFormat("tr-TR",{minimumFractionDigits:ond,maximumFractionDigits:ond}).format(Math.abs(x));
 function fiyatSeridi(){
+  btcSeriAl();
+  const saat = d => d.k.startsWith("X")||d.k==="GSPC"||d.k==="IXIC" ? (canli?.guncel ? new Date(canli.guncel) : null) : prices.updated;
   const c = d => {
     const ch = d.ch, cls = ch==null ? "" : ch>0 ? "up" : ch<0 ? "down" : "";
     const a = anlik[d.k], taze = a && Date.now()-a.t < 70000;
-    return `<div class="chip ${cls}${taze?(a.yon>0?" flash-up":" flash-down"):""}">
-      <span class="muted">${d.l}</span>
-      <b>${d.v==null?"—":(d.f||fTL2).format(d.v)}</b>
-      <div class="chg">${ch==null?'<span class="muted">bugün —</span>':`<span class="${cls}">${ch>0?"▲":ch<0?"▼":"•"} ${yuzde(ch)}</span> <span class="muted">bugün</span>`}
-      ${a?`<span class="tick ${a.yon>0?"up":"down"}">${a.yon>0?"↑":"↓"} ${yuzde(a.y, Math.abs(a.y)<0.01?3:2)} <span class="muted" style="font-weight:400">anlık</span></span>`:""}</div>
+    const zs = saat(d);
+    return `<div class="mk ${taze?(a.yon>0?" flash-up":" flash-down"):""}">
+      ${kivilcim(d.seri, ch)}
+      <div class="mk-ust">
+        <span class="mk-ik" style="background:${d.ir}">${d.ik}</span>
+        <span class="mk-ad">${d.l}<small>${zs?zs.toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit"}):"—"}</small></span>
+        <span class="mk-pill ${cls}">${ch==null?"—":yuzde(ch)}</span>
+      </div>
+      <div class="mk-fiyat">${d.v==null?"—":(d.f||fTL2).format(d.v)}</div>
+      ${a?`<div class="mk-anlik ${a.yon>0?"up":"down"}">${a.yon>0?"↑":"↓"} ${yuzde(a.y, Math.abs(a.y)<0.01?3:2)} anlık</div>`:""}
     </div>`;
   };
-  return `<div class="chips">${piyasaDegerleri().filter(d=>d.v!=null||["gram24","USD","btc"].includes(d.k)).map(c).join("")}</div>
+  return `<div class="mkgrid">${piyasaDegerleri().filter(d=>d.v!=null||["gram24","USD","btc"].includes(d.k)).map(c).join("")}</div>
   <p class="muted">${prices.updated?`Son güncelleme ${prices.updated.toLocaleTimeString("tr-TR")} · altın: ${esc(prices.goldSrc)}`:"Fiyatlar alınıyor…"}${canli?.guncel?` · hisse/fon: ${new Date(canli.guncel).toLocaleString("tr-TR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}`:""} <a href="#" data-act="yenile">Yenile</a></p>`;
 }
 
