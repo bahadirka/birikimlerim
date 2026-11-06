@@ -52,6 +52,7 @@ main a{color:var(--acc)}
 .tick{font-size:11px}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .seg button{background:none;border:0;padding:5px 10px;font:inherit;font-size:12px;color:var(--muted);cursor:pointer}
+.seg .segon{background:var(--acc);color:#fff;font-weight:600}
 .seg button.on{background:var(--acc);color:#fff;font-weight:600}
 .mk{cursor:pointer}
 .gp{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center}
@@ -103,8 +104,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 20; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 21; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:21, t:"2026-11-06", n:["Alış maliyeti \"Toplam ödediğim\" ya da \"Pay/adet başı fiyat\" olarak girilebilir","Listede kâr/zarar açıkça \"kâr\" / \"zarar\" diye yazar; mantıksız büyük oranlarda \"maliyeti kontrol edin\" uyarısı çıkar"]},
   {s:20, t:"2026-11-06", n:["Kripto: konum \"Kripto borsası\" seçilince hangi borsa olduğu seçilebilir (Binance, BtcTurk, Paribu ve diğerleri); listede görünür"]},
   {s:19, t:"2026-11-06", n:["Döviz fonları: fon ve BES eklerken tutar USD ya da EUR olarak girilebilir; listede döviz karşılığı da görünür"]},
   {s:18, t:"2026-11-06", n:["Piyasa kartına dokununca büyük grafik açılır: Gün / Hafta / Ay / Yıl","Grafikte parmağınızı gezdirince o anki fiyat, tarih ve değişim görünür"]},
@@ -354,7 +356,7 @@ function birimTL(a){
   return null;
 }
 const kurTL = c => (!c || c==="TRY") ? 1 : (prices.fx[c] ?? null);
-const maliyetTL = a => { if (a.type==="mevduat"){ const k=kurTL(a.cur); return k==null?null:(+a.qty||0)*k; } const c=sayi(a.cost), k=kurTL(a.costCur); return (c==null||k==null) ? null : c*k; };
+const maliyetTL = a => { if (a.type==="mevduat"){ const k=kurTL(a.cur); return k==null?null:(+a.qty||0)*k; } const c=sayi(a.cost), k=kurTL(a.costCur); if (c==null||k==null) return null; return a.costTip==="birim" ? c*(+a.qty||0)*k : c*k; };
 /* Vadeli mevduat: faiz = anapara × yıllık oran × gün / 365, net = brüt × (1 − stopaj) */
 const GUN = 86400000;
 function mevduatHesap(a){
@@ -725,7 +727,7 @@ function fonFormu(a, v){
     <label>Fon kodu</label><input name="symbol" autocapitalize="characters" value="${v("symbol")}">
     <div class="muted" id="fonAd">${cf?.ad?esc(cf.ad)+" · "+fN.format(cf.p)+" TL ("+esc(cf.t||"")+")":""}</div>
     <label>Bugünkü tutarı — ${bes?"AgeSA'da":"hesabınızda"} gördüğünüz değer ve para birimi</label>
-    <div style="display:flex;gap:8px"><input name="tutar" inputmode="decimal" value="" style="flex:2" placeholder="${deger!=null&&a.id?"şu an: "+fN.format(Math.round(deger/(kurTL(a.tutarCur)||1)))+" "+(PB[a.tutarCur||"TRY"]?.ad||"TL"):"ör. 125000"}">
+    <div style="display:flex;gap:8px"><input name="tutar" inputmode="decimal" value="${v("tutar")}" style="flex:2" placeholder="${deger!=null&&a.id?"şu an: "+fN.format(Math.round(deger/(kurTL(a.tutarCur)||1)))+" "+(PB[a.tutarCur||"TRY"]?.ad||"TL"):"ör. 125000"}">
       <select name="tutarCur" style="flex:1">${["TRY","USD","EUR"].map(c=>`<option value="${c}" ${(a.tutarCur||"TRY")===c?"selected":""}>${c==="TRY"?"TL":c}</option>`).join("")}</select></div>
     <p class="muted" style="margin:4px 0 0">Döviz fonuysa USD ya da EUR seçin; tutar güncel kurla çevrilir.</p>
     <details style="margin-top:10px"${(a.qty&&!cf)?" open":""}><summary class="muted" style="cursor:pointer">Pay adedini biliyorum / elle fiyat</summary>
@@ -850,7 +852,7 @@ function satir(a){
   return `<div class="row tap" data-edit="${esc(a.id)}">
     <div><div>${esc(etiket(a))}${a.konum==="kasa"?'<span class="tag">kasa</span>':""}</div>
     <div class="muted">${miktar(a)}${cf?` · <span class="pos">canlı</span> ${a.type==="abd"?"$"+fN.format(cf.p):fN.format(cf.p)+" TL"}${cf.ch!=null?` <span class="${cf.ch>=0?"pos":"neg"}">${cf.ch>=0?"+":""}${cf.ch}%</span>`:""}${a.type==="fon"||a.type==="bes"?" · "+esc(cf.t||""):""}`:""}${elle?` · elle fiyat${a.fiyatCur&&a.fiyatCur!=="TRY"?" ("+a.fiyatCur+")":""}${a.priceDate?" · "+esc(a.priceDate):""}`:""}${a.konum==="borsa"&&a.borsaAd?" · "+esc(a.borsaAd):""}${a.konumNot?" · "+esc(a.konumNot):""}</div></div>
-    <div class="r"><div>${para(d)}</div>${(a.tutarCur&&a.tutarCur!=="TRY"&&d!=null&&kurTL(a.tutarCur))?`<div class="muted">≈ ${para(d/kurTL(a.tutarCur), a.tutarCur==="USD"?fUSD:fEUR)}</div>`:""}${kz!=null?`<div class="muted ${kz>=0?"pos":"neg"}">${gizli?"":(kz>=0?"+":"")+kz.toFixed(1)+"%"}</div>`:""}</div>
+    <div class="r"><div>${para(d)}</div>${(a.tutarCur&&a.tutarCur!=="TRY"&&d!=null&&kurTL(a.tutarCur))?`<div class="muted">≈ ${para(d/kurTL(a.tutarCur), a.tutarCur==="USD"?fUSD:fEUR)}</div>`:""}${kz!=null?(Math.abs(kz)>1000?`<div class="muted" style="font-size:12px">maliyeti kontrol edin</div>`:`<div class="${kz>=0?"pos":"neg"}" style="font-size:13px">${gizli?"":yuzde(kz,1)+(kz>=0?" kâr":" zarar")}</div>`):""}</div>
   </div>`;
 }
 
@@ -928,7 +930,9 @@ function form(){
     ${ba?"":`<label>Nerede duruyor?</label>${sel("konum",KONUM,a.konum)}
     ${a.konum==="borsa"?`<label>Hangi borsa / cüzdan?</label><select name="borsaAd">${BORSALAR.map(b=>`<option value="${esc(b)}" ${(a.borsaAd||"Binance")===b?"selected":""}>${esc(b)}</option>`).join("")}</select>`:""}
     <label>Konum notu (ör. "çelik kasa", "Garanti hesabı")</label><input name="konumNot" value="${v("konumNot")}">
-    <label>Toplam maliyet (isteğe bağlı — kâr/zarar için)</label><div style="display:flex;gap:8px"><input name="cost" inputmode="decimal" value="${v("cost")}" style="flex:2"><select style="flex:1" name="costCur">${["TRY","USD","EUR"].map(c=>`<option value="${c}" ${(a.costCur||"TRY")===c?"selected":""}>${c==="TRY"?"TL":c}</option>`).join("")}</select></div>
+    <label>Alış maliyeti (isteğe bağlı — kâr/zarar hesabı için)</label>
+    <div class="seg" style="display:flex;margin-bottom:6px">${[["toplam","Toplam ödediğim"],["birim",["fon","bes"].includes(a.type)?"Pay başı fiyat":"Adet/gram başı fiyat"]].map(([k,l])=>`<label style="flex:1;margin:0;text-align:center;padding:6px 4px;font-size:12px;cursor:pointer" class="${(a.costTip||"toplam")===k?"segon":""}"><input type="radio" name="costTip" value="${k}" ${(a.costTip||"toplam")===k?"checked":""} style="display:none">${l}</label>`).join("")}</div>
+    <div style="display:flex;gap:8px"><input name="cost" inputmode="decimal" value="${v("cost")}" style="flex:2" placeholder="${(a.costTip||"toplam")==="birim"?"ör. 52,40":"ör. 250000"}"><select style="flex:1" name="costCur">${["TRY","USD","EUR"].map(c=>`<option value="${c}" ${(a.costCur||"TRY")===c?"selected":""}>${c==="TRY"?"TL":c}</option>`).join("")}</select></div>
     <label>Alış tarihi</label><input name="date" type="date" value="${v("date")}">`}
     <button class="btn" type="submit">${a.id?"Kaydet":"Ekle"}</button>
     ${a.id?`<button class="btn danger" type="button" data-act="sil">Sil</button><button class="btn ghost" type="button" data-act="vazgec">Vazgeç</button>`:""}
@@ -936,7 +940,7 @@ function form(){
 }
 function formOku(){
   const f = document.getElementById("f"); if (!f) return draft;
-  const o = {...draft}; for (const el of f.elements) if (el.name) o[el.name] = el.value; return o;
+  const o = {...draft}; for (const el of f.elements) if (el.name && !(el.type==="radio" && !el.checked)) o[el.name] = el.value; return o;
 }
 
 /* ============ Olaylar ============ */
@@ -1028,6 +1032,7 @@ document.addEventListener("click", async e => {
   } catch(ex){ t.disabled=false; err(hataMetni(ex)); }
 });
 document.addEventListener("change", e => {
+  if (e.target.form?.id==="f" && e.target.name==="costTip"){ draft = formOku(); render(); return; }
   if (e.target.form?.id==="f" && e.target.name==="konum"){ draft = formOku(); render(); return; }
   if (e.target.form?.id==="f" && e.target.name==="type"){ const eskiTip = draft?.type, o = formOku(); if (!o.id && (!o.konum || o.konum===VARSAYILAN_KONUM[eskiTip])) o.konum = VARSAYILAN_KONUM[e.target.value] || o.konum; draft = {...o, type:e.target.value}; render(); }
 });
