@@ -104,8 +104,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 26; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 28; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:28, t:"2026-11-07", n:["Sürüm 27'deki günlük kâr/zarar gösterimi geri alındı; uygulama Sürüm 26 haline döndü"]},
   {s:26, t:"2026-11-07", n:["Hisse eklerken şirket adıyla arama (ör. \"google\" → GOOGL, \"türk hava\" → THYAO)","Listede hisselerin yanında şirket adı görünür"]},
   {s:25, t:"2026-11-07", n:["Yüksek kârlarda (ör. uzun süre tutulan BTC) yanlış \"maliyeti kontrol edin\" uyarısı kaldırıldı; gerçek kâr yüzdesi ve tutarı gösterilir","Düzenleme ekranında girilen maliyetle hesaplanan kâr önizlemesi"]},
   {s:24, t:"2026-11-06", n:["Kripto ve ABD hisselerinde dolar karşılığı (ve 1 coin'in dolar fiyatı) görünür; kategori başlığında dolar toplamı"]},
