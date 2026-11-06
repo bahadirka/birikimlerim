@@ -104,8 +104,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 22; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 23; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:23, t:"2026-11-06", n:["Vadeli mevduatta vade sonu net kârı tutar ve yüzde olarak görünür; bugüne kadar işleyen faiz de yazar","Mevduat formunda yıllık net getiri"]},
   {s:22, t:"2026-11-06", n:["Kâr/zarar varlığın kendi para biriminde hesaplanır: döviz fonlarında USD/EUR, TL fonlarda TL","Döviz fonlarında fonun döviz fiyatı TEFAS fiyatı ve TCMB kuruyla bulunur; banka ekranıyla aynı sonuç","Yüzdenin altında kâr/zarar tutarı da yazar (ör. +$14.189)"]},
   {s:21, t:"2026-11-06", n:["Alış maliyeti \"Toplam ödediğim\" ya da \"Pay/adet başı fiyat\" olarak girilebilir","Listede kâr/zarar açıkça \"kâr\" / \"zarar\" diye yazar; mantıksız büyük oranlarda \"maliyeti kontrol edin\" uyarısı çıkar"]},
   {s:20, t:"2026-11-06", n:["Kripto: konum \"Kripto borsası\" seçilince hangi borsa olduğu seçilebilir (Binance, BtcTurk, Paribu ve diğerleri); listede görünür"]},
@@ -390,7 +391,7 @@ function tcmbKur(tarih, pb){
 }
 const kzPB = a => (a.type==="fon"||a.type==="bes") ? (a.tutarCur && a.tutarCur!=="TRY" ? a.tutarCur : (a.costCur||"TRY")) : (a.costCur||"TRY");
 function kzHesap(a){
-  if (a.type==="mevduat"){ const m=mevduatHesap(a), pb=a.cur||"TRY"; return m.ana ? {pb, oran:(m.simdi/m.ana-1)*100, tutar:m.simdi-m.ana} : null; }
+  if (a.type==="mevduat"){ const m=mevduatHesap(a), pb=a.cur||"TRY"; return m.ana ? {pb, oran:m.netFaiz/m.ana*100, tutar:m.netFaiz, etiket:"vade sonu kârı"} : null; }
   const c = sayi(a.cost); if (c==null || !c) return null;
   const pb = kzPB(a), qty = +a.qty||0;
   let maliyet;
@@ -863,7 +864,7 @@ function miktar(a){
   if (a.type==="mevduat"){
     const m = mevduatHesap(a), c = a.cur==="TRY"||!a.cur ? " TL" : " "+a.cur;
     const v = m.kalan==null ? "" : m.kalan<0 ? ` · <span class="neg">vade ${-m.kalan} gün önce doldu</span>` : m.kalan===0 ? ` · <span class="neg">vade bugün</span>` : m.kalan<=7 ? ` · <span class="neg">vadeye ${m.kalan} gün</span>` : ` · vadeye ${m.kalan} gün`;
-    return `%${fN.format(m.oran)} · ${fN.format(Math.round(m.ana))}${c}${v} · vade sonu ${fN.format(Math.round(m.vadeSonu))}${c}`;
+    return `%${fN.format(m.oran)} · ${fN.format(Math.round(m.ana))}${c}${v}<br>vade sonu <b>${fN.format(Math.round(m.vadeSonu))}${c}</b> · net kâr <span class="pos">+${fN.format(Math.round(m.netFaiz))}${c} (${yuzde(m.netFaiz/m.ana*100)})</span>${m.gecen>0&&m.kalan>0?`<br>bugüne kadar işleyen: +${fN.format(Math.round(m.simdi-m.ana))}${c}`:""}`;
   }
   return q+" adet";
 }
@@ -873,7 +874,7 @@ function satir(a){
   return `<div class="row tap" data-edit="${esc(a.id)}">
     <div><div>${esc(etiket(a))}${a.konum==="kasa"?'<span class="tag">kasa</span>':""}</div>
     <div class="muted">${miktar(a)}${cf?` · <span class="pos">canlı</span> ${a.type==="abd"?"$"+fN.format(cf.p):fN.format(cf.p)+" TL"}${cf.ch!=null?` <span class="${cf.ch>=0?"pos":"neg"}">${cf.ch>=0?"+":""}${cf.ch}%</span>`:""}${a.type==="fon"||a.type==="bes"?" · "+esc(cf.t||""):""}`:""}${elle?` · elle fiyat${a.fiyatCur&&a.fiyatCur!=="TRY"?" ("+a.fiyatCur+")":""}${a.priceDate?" · "+esc(a.priceDate):""}`:""}${a.konum==="borsa"&&a.borsaAd?" · "+esc(a.borsaAd):""}${a.konumNot?" · "+esc(a.konumNot):""}</div></div>
-    <div class="r"><div>${para(d)}</div>${(()=>{ if (!(a.tutarCur&&a.tutarCur!=="TRY"&&d!=null)) return ""; const k = (cf && tcmbKur(cf.t, a.tutarCur)) || kurTL(a.tutarCur); return k ? `<div class="muted">≈ ${para(d/k, a.tutarCur==="USD"?fUSD:fEUR)}</div>` : ""; })()}${kz!=null?(Math.abs(kz)>1000?`<div class="muted" style="font-size:12px">maliyeti kontrol edin</div>`:`<div class="${kz>=0?"pos":"neg"}" style="font-size:13px">${gizli?"":yuzde(kz,2)+(kz>=0?" kâr":" zarar")}</div><div class="${kz>=0?"pos":"neg"}" style="font-size:12px">${gizli?"••••":(kh.tutar>=0?"+":"−")+pbFmt(kh.pb).format(Math.abs(kh.tutar))}</div>`):""}</div>
+    <div class="r"><div>${para(d)}</div>${(()=>{ if (!(a.tutarCur&&a.tutarCur!=="TRY"&&d!=null)) return ""; const k = (cf && tcmbKur(cf.t, a.tutarCur)) || kurTL(a.tutarCur); return k ? `<div class="muted">≈ ${para(d/k, a.tutarCur==="USD"?fUSD:fEUR)}</div>` : ""; })()}${kz!=null?(Math.abs(kz)>1000?`<div class="muted" style="font-size:12px">maliyeti kontrol edin</div>`:`<div class="${kz>=0?"pos":"neg"}" style="font-size:13px">${gizli?"":yuzde(kz,2)+(kz>=0?" kâr":" zarar")}</div><div class="${kz>=0?"pos":"neg"}" style="font-size:12px">${gizli?"••••":(kh.tutar>=0?"+":"−")+pbFmt(kh.pb).format(Math.abs(kh.tutar))}</div>${kh.etiket?`<div class="muted" style="font-size:11px">${kh.etiket}</div>`:""}`):""}</div>
   </div>`;
 }
 
@@ -938,7 +939,7 @@ function form(){
       <div style="display:flex;gap:8px"><div style="flex:1"><label>Başlangıç</label><input name="bas" type="date" value="${v("bas")||bugun()}"></div><div style="flex:1"><label>Vade sonu</label><input name="vade" type="date" value="${v("vade")}"></div></div>
       <label>Stopaj oranı (%) — bankanızın uyguladığı oran</label><input name="stopaj" inputmode="decimal" value="${v("stopaj")}" placeholder="ör. 15">
       <label>Vade sonu tutarı (isteğe bağlı — bankanın verdiği net tutar; girerseniz hesap yerine bu kullanılır)</label><input name="vadeTutar" inputmode="decimal" value="${v("vadeTutar")}">
-      ${a.qty&&a.vade?`<div class="card" style="margin-top:12px;background:var(--bg)"><div class="row"><span>Süre</span><b>${m.gunToplam} gün</b></div><div class="row"><span>Brüt faiz</span><b>${fN.format(Math.round(m.brut))}</b></div><div class="row"><span>Net faiz</span><b>${fN.format(Math.round(m.netFaiz))}</b></div><div class="row"><span>Vade sonu tutarı</span><b>${fN.format(Math.round(m.vadeSonu))}</b></div><div class="row"><span>Bugünkü değer (işlemiş faizle)</span><b>${fN.format(Math.round(m.simdi))}</b></div></div>`:""}`; break; }
+      ${a.qty&&a.vade?`<div class="card" style="margin-top:12px;background:var(--bg)"><div class="row"><span>Süre</span><b>${m.gunToplam} gün</b></div><div class="row"><span>Brüt faiz</span><b>${fN.format(Math.round(m.brut))}</b></div><div class="row"><span>Net faiz (kâr)</span><b class="pos">+${fN.format(Math.round(m.netFaiz))} (${yuzde(m.ana?m.netFaiz/m.ana*100:0)})</b></div>${m.gunToplam?`<div class="row"><span>Yıllık net getiri</span><b>${yuzde(m.ana?m.netFaiz/m.ana*365/m.gunToplam*100:0)}</b></div>`:""}<div class="row"><span>Vade sonu tutarı</span><b>${fN.format(Math.round(m.vadeSonu))}</b></div><div class="row"><span>Bugünkü değer (işlemiş faizle)</span><b>${fN.format(Math.round(m.simdi))}</b></div></div>`:""}`; break; }
     case "alacak": case "borc": ozel = `<label>${a.type==="alacak"?"Kimden alacaklısınız?":"Kime borçlusunuz?"} (kişi veya kurum)</label><input name="kisi" value="${v("kisi")}">
       <label>Para birimi</label>${sel("cur",Object.fromEntries(PARA.map(p=>[p,p])),a.cur||"TRY")}<label>Kalan tutar</label><input name="qty" inputmode="decimal" value="${v("qty")}">
       <label>Vade tarihi (isteğe bağlı)</label><input name="vade" type="date" value="${v("vade")}">
