@@ -35,6 +35,8 @@ input,select{width:100%;padding:11px;border:1px solid var(--line);border-radius:
 .btn{display:block;width:100%;padding:13px;border:0;border-radius:12px;background:var(--acc);color:#fff;font:inherit;font-weight:600;margin-top:14px;cursor:pointer}
 .btn.ghost{background:none;color:var(--fg);border:1px solid var(--line)}
 .btn.danger{background:none;color:var(--neg);border:1px solid var(--neg)}
+main a{color:var(--acc)}
+.iconbtn.on{border-color:var(--acc);color:var(--acc)}
 .iconbtn{background:none;border:1px solid var(--line);border-radius:10px;padding:6px 10px;color:var(--fg);font:inherit;font-size:13px;margin-left:6px;cursor:pointer}
 .pos{color:var(--pos)}.neg{color:var(--neg)}
 .bar{height:12px;border-radius:6px;background:var(--line);overflow:hidden;display:flex;margin:10px 0}
@@ -64,8 +66,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 13; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 14; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:14, t:"2026-11-06", n:["Ayarlar ayrı sayfada: sağ üstteki ⚙︎ düğmesi","Özet'te renkli dilim grafik; dilime ya da satıra dokununca o kategorinin detayları açılır","Renkler renk körlüğüne uygun, doğrulanmış palete geçirildi"]},
   {s:13, t:"2026-11-06", n:["Açılışta Google oturumu hatırlanıyor: oturum yüklenirken artık giriş ekranı gösterilmiyor","Giriş yaparken hesap seçme ekranı her seferinde sorulmuyor"]},
   {s:12, t:"2026-11-06", n:["Fon ve BES eklerken fonu adıyla arama (ör. \"AgeSA hisse\")","Pay adedi yerine bugünkü TL tutarı girilebilir; pay adedi TEFAS fiyatından hesaplanır ve değer her gün güncellenir"]},
   {s:11, t:"2026-11-06", n:["Face ID ile açma: kasa parolası yazmadan tek dokunuşla açılır (her cihazda bir kez etkinleştirilir)","Şifreleme aynen korunur; kasa parolası yedek olarak geçerli"]},
@@ -187,19 +190,22 @@ const lsSet = (k,v) => { try { localStorage.setItem(k,v); } catch {} };
 let gizli = lsGet("gizle") === "1";
 
 const TYPES = {
-  altin:{ad:"Altın", renk:"#d4a017"},
-  gumus:{ad:"Gümüş", renk:"#9aa5b1"},
-  nakit:{ad:"Nakit / Döviz", renk:"#0c8599"},
-  bist:{ad:"Hisse (BIST)", renk:"#e4572e"},
-  abd:{ad:"Hisse (ABD)", renk:"#4c6ef5"},
-  kripto:{ad:"Kripto", renk:"#f59f00"},
-  fon:{ad:"Yatırım Fonu", renk:"#7048e8"},
-  bes:{ad:"BES", renk:"#ae3ec9"},
-  mevduat:{ad:"Vadeli Mevduat", renk:"#1971c2"},
+  altin:{ad:"Altın", renk:"#eda100", koyu:"#c98500"},
+  gumus:{ad:"Gümüş", renk:"#878580", koyu:"#9a988f"},
+  nakit:{ad:"Nakit / Döviz", renk:"#2a78d6", koyu:"#3987e5"},
+  bist:{ad:"Hisse (BIST)", renk:"#eb6834", koyu:"#d95926"},
+  abd:{ad:"Hisse (ABD)", renk:"#008300", koyu:"#008300"},
+  kripto:{ad:"Kripto", renk:"#6250d6", koyu:"#9085e9"},
+  fon:{ad:"Yatırım Fonu", renk:"#1baf7a", koyu:"#199e70"},
+  bes:{ad:"BES", renk:"#e87ba4", koyu:"#d55181"},
+  mevduat:{ad:"Vadeli Mevduat", renk:"#e34948", koyu:"#e66767"},
   alacak:{ad:"Alacak", renk:"#2b8a3e"},
   borc:{ad:"Borç", renk:"#c92a2a"}
 };
 const isBA = a => a.type==="alacak" || a.type==="borc";
+const PASTA_SIRA = ["nakit","bist","fon","altin","bes","abd","kripto","mevduat","gumus"]; // renk sırası doğrulandı; dilimler bu sırada
+const renkOf = k => (matchMedia("(prefers-color-scheme: dark)").matches ? TYPES[k].koyu : TYPES[k].renk) || TYPES[k].renk;
+let filtre = null; // Varlıklar'da tek kategori
 const ALTIN = {gram24:"Gram (24 ayar)", gram22:"Gram (22 ayar)", ceyrek:"Çeyrek", yarim:"Yarım", tam:"Tam", cumhuriyet:"Cumhuriyet", ons:"Ons"};
 const KONUM = {kasa:"Özel kasa", banka:"Banka", araci:"Aracı kurum", emeklilik:"Emeklilik şirketi", borsa:"Kripto borsası", diger:"Diğer"};
 const VARSAYILAN_KONUM = {altin:"kasa", gumus:"kasa", nakit:"kasa", bist:"araci", abd:"araci", fon:"araci", bes:"emeklilik", kripto:"borsa", mevduat:"banka"};
@@ -382,9 +388,9 @@ function render(){
   if (screen==="unlock") return acEkrani();
   app.innerHTML = `
   <header><h1>Birikimlerim${demo?' <span class="tag">DEMO</span>':''}</h1>
-    <div><button class="iconbtn" data-act="gizle">${gizli?"Göster":"Gizle"}</button><button class="iconbtn" data-act="kilitle">Kilitle</button></div>
+    <div><button class="iconbtn" data-act="gizle">${gizli?"Göster":"Gizle"}</button><button class="iconbtn" data-act="kilitle">Kilitle</button>${demo?"":`<button class="iconbtn ${tab==="ayarlar"?"on":""}" data-tab="ayarlar" aria-label="Ayarlar" style="font-size:16px">⚙︎</button>`}</div>
   </header>
-  <main>${tab==="ozet"?ozet():tab==="varlik"?varliklar():tab==="kasa"?kasa():tab==="ba"?borcAlacak():form()}</main>
+  <main>${tab==="ozet"?ozet():tab==="varlik"?varliklar():tab==="kasa"?kasa():tab==="ba"?borcAlacak():tab==="ayarlar"?ayarlar():form()}</main>
   <nav>${[["ozet","Özet"],["varlik","Varlıklar"],["ba","Borç/Alacak"],["kasa","Kasa"],["ekle",draft?.id?"Düzenle":"Ekle"]].map(([k,l])=>`<button data-tab="${k}" class="${tab===k?"on":""}">${l}</button>`).join("")}</nav>`;
 }
 
@@ -460,13 +466,37 @@ function ozet(){
     <div class="muted">${prices.fx.USD?`≈ ${para(t.net/prices.fx.USD,fUSD)}`:""}
       ${t.kz!=null?` · <span class="${t.kz>=0?"pos":"neg"}">${gizli?"••••":(t.kz>=0?"+":"")+fTL.format(t.kz)+" ("+t.kzOran.toFixed(1)+"%)"}</span> <span class="muted">(maliyeti girilenler)</span>`:""}</div>
     ${t.eksik?`<p class="muted">${t.eksik} varlığın fiyatı yok, toplama katılmadı.</p>`:""}
-    ${sira.length?`<div class="bar">${sira.map(([k,v])=>`<div style="width:${v/top*100}%;background:${TYPES[k].renk}"></div>`).join("")}</div>
-    <div class="legend">${sira.map(([k,v])=>`<span><span class="dot" style="background:${TYPES[k].renk}"></span>${TYPES[k].ad} %${(v/top*100).toFixed(0)}</span>`).join("")}</div>`:`<p class="muted">Henüz varlık yok. "Ekle"den başlayın.</p>`}
   </div>
+  ${sira.length?`<div class="card">${pasta(grup, top)}</div>`:`<div class="card"><p class="muted">Henüz varlık yok. "Ekle"den başlayın.</p></div>`}
   <div class="card"><div class="muted" style="margin-bottom:6px">Portföy değeri</div>${grafik()}</div>
-  <h2>Piyasa</h2>${fiyatSeridi()}
-  ${demo?"":ayarlar()}`;
+  <h2>Piyasa</h2>${fiyatSeridi()}`;
 }
+
+/* Dilim grafik: kategoriye dokununca Varlıklar o kategoriyle açılır */
+function pasta(grup, top){
+  const dil = PASTA_SIRA.filter(k=>grup[k]>0).map(k=>({k, v:grup[k], o:grup[k]/top}));
+  const R=92, r=58, C=100;
+  const nokta = (a,rad)=>[C+rad*Math.sin(a), C-rad*Math.cos(a)];
+  let a0 = 0, yollar = "";
+  for (const d of dil){
+    const a1 = a0 + d.o*2*Math.PI;
+    if (dil.length===1){
+      yollar += `<circle cx="${C}" cy="${C}" r="${(R+r)/2}" fill="none" stroke="${renkOf(d.k)}" stroke-width="${R-r}" data-kat="${d.k}" style="cursor:pointer"><title>${TYPES[d.k].ad}</title></circle>`;
+    } else {
+      const [x0,y0]=nokta(a0,R),[x1,y1]=nokta(a1,R),[x2,y2]=nokta(a1,r),[x3,y3]=nokta(a0,r), b = (a1-a0)>Math.PI?1:0;
+      yollar += `<path d="M${x0.toFixed(2)},${y0.toFixed(2)} A${R},${R} 0 ${b} 1 ${x1.toFixed(2)},${y1.toFixed(2)} L${x2.toFixed(2)},${y2.toFixed(2)} A${r},${r} 0 ${b} 0 ${x3.toFixed(2)},${y3.toFixed(2)} Z" fill="${renkOf(d.k)}" stroke="var(--card)" stroke-width="2" stroke-linejoin="round" data-kat="${d.k}" style="cursor:pointer"><title>${TYPES[d.k].ad} %${(d.o*100).toFixed(1)}</title></path>`;
+    }
+    a0 = a1;
+  }
+  return `<div class="muted" style="margin-bottom:6px">Dağılım · dilime dokunun</div>
+  <svg viewBox="0 0 200 200" style="max-width:240px;margin:0 auto" role="img" aria-label="Varlık dağılımı">${yollar}
+    <text x="100" y="94" text-anchor="middle" font-size="11" fill="var(--muted)">Varlıklar</text>
+    <text x="100" y="114" text-anchor="middle" font-size="15" font-weight="700" fill="var(--fg)">${gizli?"••••":fKisa(top)}</text></svg>
+  <div style="margin-top:8px">${dil.slice().sort((x,y)=>y.v-x.v).map(d=>`<div class="row tap" data-kat="${d.k}">
+    <span><span class="dot" style="background:${renkOf(d.k)}"></span>${TYPES[d.k].ad}</span>
+    <span class="r"><b>%${(d.o*100).toFixed(d.o<0.1?1:0)}</b> <span class="muted">${para(d.v)}</span> <span class="muted">›</span></span></div>`).join("")}</div>`;
+}
+const fKisa = v => v>=1e6 ? "₺"+new Intl.NumberFormat("tr-TR",{maximumFractionDigits:2}).format(v/1e6)+" mn" : v>=1e3 ? "₺"+new Intl.NumberFormat("tr-TR",{maximumFractionDigits:0}).format(v/1e3)+" bin" : fTL.format(v);
 
 /* Fon / BES formu: adıyla arama + pay adedi YA DA bugünkü TL tutarı */
 function fonFormu(a, v){
@@ -607,7 +637,8 @@ function satir(a){
 
 function varliklar(){
   if (!S.assets.length) return `<div class="card"><p class="muted">Henüz varlık yok.</p><button class="btn" data-tab="ekle">Varlık ekle</button></div>`;
-  return Object.keys(TYPES).filter(k=>k!=="alacak"&&k!=="borc").map(k=>{
+  const ust = filtre ? `<div class="row" style="padding:0 0 8px"><b>${TYPES[filtre].ad}</b><button class="iconbtn" data-act="filtreYok">Tümünü göster</button></div>` : "";
+  return ust + Object.keys(TYPES).filter(k=>k!=="alacak"&&k!=="borc"&&(!filtre||k===filtre)).map(k=>{
     const l = S.assets.filter(a=>a.type===k); if (!l.length) return "";
     return `<h2>${TYPES[k].ad} · ${para(toplam(l).v)}</h2><div class="card">${l.map(satir).join("")}</div>`;
   }).join("");
@@ -690,9 +721,11 @@ function formOku(){
 
 /* ============ Olaylar ============ */
 document.addEventListener("click", async e => {
+  const kat = e.target.closest("[data-kat]");
+  if (kat && screen==="app"){ filtre = kat.dataset.kat; tab="varlik"; render(); window.scrollTo(0,0); return; }
   const t = e.target.closest("[data-act],[data-tab],[data-edit],[data-yeni]"); if (!t) return;
   if (t.dataset.yeni){ draft={type:t.dataset.yeni, cur:"TRY"}; tab="ekle"; render(); window.scrollTo(0,0); return; }
-  if (t.dataset.tab){ if (t.dataset.tab!=="ekle") draft=null; tab=t.dataset.tab; render(); window.scrollTo(0,0); return; }
+  if (t.dataset.tab){ if (t.dataset.tab!=="ekle") draft=null; filtre=null; tab=t.dataset.tab; render(); window.scrollTo(0,0); return; }
   if (t.dataset.edit){ const a=S.assets.find(x=>x.id===t.dataset.edit); if(a){ draft={...a}; tab="ekle"; render(); window.scrollTo(0,0);} return; }
   e.preventDefault();
   const act = t.dataset.act, err = m => { const x=document.getElementById("err"); if(x) x.textContent=m; };
@@ -758,6 +791,7 @@ document.addEventListener("click", async e => {
       salt = crypto.getRandomValues(new Uint8Array(16)); key = await anahtarUret(p1, salt);
       await kaydet(true); const vardi = !!fidKayit(); fidSil(); render(); toast(vardi ? "Parola değiştirildi. Face ID'yi yeniden açın." : "Parola değiştirildi");
     }
+    if (act==="filtreYok"){ filtre=null; render(); }
     if (act==="kilitle") kilitle();
     if (act==="gizle"){ gizli=!gizli; lsSet("gizle",gizli?"1":"0"); render(); }
     if (act==="yenile") fiyatlariAl();
