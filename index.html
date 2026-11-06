@@ -103,8 +103,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 18; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 19; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:19, t:"2026-11-06", n:["Döviz fonları: fon ve BES eklerken tutar USD ya da EUR olarak girilebilir; listede döviz karşılığı da görünür"]},
   {s:18, t:"2026-11-06", n:["Piyasa kartına dokununca büyük grafik açılır: Gün / Hafta / Ay / Yıl","Grafikte parmağınızı gezdirince o anki fiyat, tarih ve değişim görünür"]},
   {s:17, t:"2026-11-06", n:["Net varlık TL / USD / EUR olarak görülebilir (Özet'teki düğmelerle seçilir, diğer ikisi altında yazar)","Piyasa kartında Bitcoin artık dolar ($) olarak"]},
   {s:16, t:"2026-11-06", n:["Piyasa kartları yenilendi: simge, saat ve yüzde etiketi, büyük fiyat","Her kartta gün içi mini grafik (yükselişte yeşil, düşüşte kırmızı)"]},
@@ -721,8 +722,10 @@ function fonFormu(a, v){
     <div id="fonSonuc"></div>
     <label>Fon kodu</label><input name="symbol" autocapitalize="characters" value="${v("symbol")}">
     <div class="muted" id="fonAd">${cf?.ad?esc(cf.ad)+" · "+fN.format(cf.p)+" TL ("+esc(cf.t||"")+")":""}</div>
-    <label>Bugünkü tutarı (TL) — ${bes?"AgeSA'da":"hesabınızda"} gördüğünüz değer</label>
-    <input name="tutar" inputmode="decimal" value="" placeholder="${deger!=null&&a.id?"şu an: "+fN.format(Math.round(deger))+" TL":"ör. 125000"}">
+    <label>Bugünkü tutarı — ${bes?"AgeSA'da":"hesabınızda"} gördüğünüz değer ve para birimi</label>
+    <div style="display:flex;gap:8px"><input name="tutar" inputmode="decimal" value="" style="flex:2" placeholder="${deger!=null&&a.id?"şu an: "+fN.format(Math.round(deger/(kurTL(a.tutarCur)||1)))+" "+(PB[a.tutarCur||"TRY"]?.ad||"TL"):"ör. 125000"}">
+      <select name="tutarCur" style="flex:1">${["TRY","USD","EUR"].map(c=>`<option value="${c}" ${(a.tutarCur||"TRY")===c?"selected":""}>${c==="TRY"?"TL":c}</option>`).join("")}</select></div>
+    <p class="muted" style="margin:4px 0 0">Döviz fonuysa USD ya da EUR seçin; tutar güncel kurla çevrilir.</p>
     <details style="margin-top:10px"${(a.qty&&!cf)?" open":""}><summary class="muted" style="cursor:pointer">Pay adedini biliyorum / elle fiyat</summary>
       <label>Pay adedi</label><input name="qty" inputmode="decimal" value="${v("qty")}">
       <label>Birim pay fiyatı — TEFAS fiyatı bulunursa otomatik (TL) kullanılır, bulunmazsa bu</label><div style="display:flex;gap:8px"><input name="manualPrice" inputmode="decimal" value="${v("manualPrice")}" style="flex:2"><select style="flex:1" name="fiyatCur">${["TRY","USD","EUR"].map(c=>`<option value="${c}" ${(a.fiyatCur||"TRY")===c?"selected":""}>${c==="TRY"?"TL":c}</option>`).join("")}</select></div>
@@ -845,7 +848,7 @@ function satir(a){
   return `<div class="row tap" data-edit="${esc(a.id)}">
     <div><div>${esc(etiket(a))}${a.konum==="kasa"?'<span class="tag">kasa</span>':""}</div>
     <div class="muted">${miktar(a)}${cf?` · <span class="pos">canlı</span> ${a.type==="abd"?"$"+fN.format(cf.p):fN.format(cf.p)+" TL"}${cf.ch!=null?` <span class="${cf.ch>=0?"pos":"neg"}">${cf.ch>=0?"+":""}${cf.ch}%</span>`:""}${a.type==="fon"||a.type==="bes"?" · "+esc(cf.t||""):""}`:""}${elle?` · elle fiyat${a.fiyatCur&&a.fiyatCur!=="TRY"?" ("+a.fiyatCur+")":""}${a.priceDate?" · "+esc(a.priceDate):""}`:""}${a.konumNot?" · "+esc(a.konumNot):""}</div></div>
-    <div class="r"><div>${para(d)}</div>${kz!=null?`<div class="muted ${kz>=0?"pos":"neg"}">${gizli?"":(kz>=0?"+":"")+kz.toFixed(1)+"%"}</div>`:""}</div>
+    <div class="r"><div>${para(d)}</div>${(a.tutarCur&&a.tutarCur!=="TRY"&&d!=null&&kurTL(a.tutarCur))?`<div class="muted">≈ ${para(d/kurTL(a.tutarCur), a.tutarCur==="USD"?fUSD:fEUR)}</div>`:""}${kz!=null?`<div class="muted ${kz>=0?"pos":"neg"}">${gizli?"":(kz>=0?"+":"")+kz.toFixed(1)+"%"}</div>`:""}</div>
   </div>`;
 }
 
@@ -1030,7 +1033,9 @@ document.addEventListener("submit", async e => {
   o.qty = sayi(o.qty); o.cost = sayi(o.cost); if ("manualPrice" in o) o.manualPrice = sayi(o.manualPrice);
   if (o.type==="fon" || o.type==="bes") {
     o.symbol = String(o.symbol||"").trim().toUpperCase();
-    const tutar = sayi(o.tutar); delete o.tutar;
+    const tutarHam = sayi(o.tutar), tkur = kurTL(o.tutarCur||"TRY"); delete o.tutar;
+    if (tutarHam && tutarHam > 0 && !tkur) return toast("Kur henüz yüklenmedi, biraz bekleyip tekrar deneyin");
+    const tutar = tutarHam ? tutarHam * tkur : null;
     if (tutar && tutar > 0) {
       const cf = canliFiyat(o), mp = o.manualPrice, k = kurTL(o.fiyatCur);
       const birim = cf ? cf.p : (mp && k ? mp*k : null);
