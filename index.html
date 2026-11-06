@@ -64,8 +64,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 10; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 11; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:11, t:"2026-11-06", n:["Face ID ile açma: kasa parolası yazmadan tek dokunuşla açılır (her cihazda bir kez etkinleştirilir)","Şifreleme aynen korunur; kasa parolası yedek olarak geçerli"]},
   {s:10, t:"2026-11-06", n:["Vadeli mevduat: banka, anapara, faiz oranı, başlangıç ve vade tarihi, stopaj","Brüt/net faiz, vade sonu tutarı ve işlemiş faizle bugünkü değer otomatik hesaplanır; bankanın verdiği vade sonu tutarı da girilebilir","Vadesine 7 gün kalan ve vadesi dolan mevduatlarda uyarı"]},
   {s:9, t:"2026-11-06", n:["Canlı fiyatlar: BIST ve ABD hisseleri (~15 dk gecikmeli, yarım saatte bir), TEFAS yatırım ve BES fonları (günlük)","Canlı fiyatı olan varlıklarda \"canlı\" etiketi ve günlük değişim; bulunamayanlarda elle fiyat kullanılmaya devam eder"]},
   {s:8, t:"2026-11-06", n:["Sürüm notları eklendi: güncellemeden sonra yenilikler bir kez gösterilir, tüm geçmiş Ayarlar'da"]},
@@ -98,9 +99,71 @@ if (CONFIGURED) {
 const te = new TextEncoder(), td = new TextDecoder();
 function b64(buf){ const a = new Uint8Array(buf); let s=""; for(let i=0;i<a.length;i+=0x8000) s += String.fromCharCode.apply(null, a.subarray(i,i+0x8000)); return btoa(s); }
 const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+let anahtarHam = null; // kasa açıkken bellekte; Face ID kaydı için gerekir
 async function anahtarUret(parola, salt){
-  const base = await crypto.subtle.importKey("raw", te.encode(parola), "PBKDF2", false, ["deriveKey"]);
-  return crypto.subtle.deriveKey({name:"PBKDF2", salt, iterations:310000, hash:"SHA-256"}, base, {name:"AES-GCM", length:256}, false, ["encrypt","decrypt"]);
+  // deriveBits(256) = deriveKey(AES-256) ile aynı anahtar; eski kasalar aynen açılır
+  const base = await crypto.subtle.importKey("raw", te.encode(parola), "PBKDF2", false, ["deriveBits"]);
+  anahtarHam = new Uint8Array(await crypto.subtle.deriveBits({name:"PBKDF2", salt, iterations:310000, hash:"SHA-256"}, base, 256));
+  return crypto.subtle.importKey("raw", anahtarHam, "AES-GCM", false, ["encrypt","decrypt"]);
+}
+
+/* ============ Face ID ile açma (WebAuthn PRF) ============
+   Face ID'nin ürettiği gizli değer, kasa anahtarını SADECE bu cihazda sarar.
+   Sunucuya hiçbir şey gitmez; kasa parolası yedek olarak geçerli kalır. */
+const fidAnahtar = () => "faceid:" + kasaId;
+function fidKayit(){ try { return JSON.parse(lsGet(fidAnahtar()) || "null"); } catch { return null; } }
+const fidDestek = () => !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create);
+const fidHazir = () => { const r = fidKayit(); return !!(r && r.ct && kasaDoc && r.salt === kasaDoc.salt); };
+function fidSil(){ try { localStorage.removeItem(fidAnahtar()); } catch {} }
+async function prfAl(cid, ps){
+  const cred = await navigator.credentials.get({publicKey:{challenge: crypto.getRandomValues(new Uint8Array(32)), rpId: location.hostname,
+    allowCredentials:[{type:"public-key", id: cid}], userVerification:"required", timeout:60000, extensions:{prf:{eval:{first: ps}}}}});
+  const r = cred.getClientExtensionResults()?.prf?.results?.first;
+  if (!r) throw new Error("prf-yok");
+  return new Uint8Array(r);
+}
+async function fidSar(prf){
+  const k = await crypto.subtle.importKey("raw", prf, "AES-GCM", false, ["encrypt"]);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({name:"AES-GCM", iv}, k, anahtarHam);
+  const r = fidKayit() || {};
+  lsSet(fidAnahtar(), JSON.stringify({...r, iv:b64(iv), ct:b64(ct), salt:kasaDoc.salt}));
+}
+async function faceIdEtkinlestir(){
+  if (!anahtarHam) throw new Error("kilitli");
+  const ps = crypto.getRandomValues(new Uint8Array(32));
+  const cred = await navigator.credentials.create({publicKey:{
+    rp:{name:"Birikimlerim", id: location.hostname},
+    user:{id: crypto.getRandomValues(new Uint8Array(16)), name: benEmail || "birikimlerim", displayName: "Birikimlerim kasası"},
+    challenge: crypto.getRandomValues(new Uint8Array(32)),
+    pubKeyCredParams:[{type:"public-key", alg:-7},{type:"public-key", alg:-257}],
+    authenticatorSelection:{authenticatorAttachment:"platform", residentKey:"preferred", userVerification:"required"},
+    timeout:60000, extensions:{prf:{eval:{first: ps}}}}});
+  const ext = cred.getClientExtensionResults()?.prf;
+  if (ext && ext.enabled === false) throw new Error("prf-yok");
+  lsSet(fidAnahtar(), JSON.stringify({cid:b64(cred.rawId), ps:b64(ps)}));
+  if (ext?.results?.first) { await fidSar(new Uint8Array(ext.results.first)); return true; }
+  return false; // iOS bazen ilk adımda değeri vermez → "Doğrula" ile ikinci dokunuş
+}
+async function faceIdDogrula(){
+  const r = fidKayit(); if (!r?.cid) throw new Error("kayit-yok");
+  await fidSar(await prfAl(unb64(r.cid), unb64(r.ps)));
+}
+async function faceIdAc(){
+  const r = fidKayit();
+  const prf = await prfAl(unb64(r.cid), unb64(r.ps));
+  const k = await crypto.subtle.importKey("raw", prf, "AES-GCM", false, ["decrypt"]);
+  anahtarHam = new Uint8Array(await crypto.subtle.decrypt({name:"AES-GCM", iv: unb64(r.iv)}, k, unb64(r.ct)));
+  salt = unb64(kasaDoc.salt);
+  key = await crypto.subtle.importKey("raw", anahtarHam, "AES-GCM", false, ["encrypt","decrypt"]);
+  S = await coz(key, kasaDoc.iv, kasaDoc.ct);
+  S.assets ||= []; S.snapshots ||= [];
+}
+function fidHata(e){
+  if (e?.message === "prf-yok") return "Bu cihaz Face ID ile kasa açmayı desteklemiyor (iPhone'da iOS 18 veya üstü ve Safari gerekir).";
+  if (e?.name === "NotAllowedError" || e?.name === "AbortError") return "Face ID iptal edildi ya da süresi doldu. Tekrar deneyin.";
+  if (e?.name === "InvalidStateError") return "Bu cihazda zaten bir Face ID kaydı var. Tekrar deneyin.";
+  return "Face ID kullanılamadı: " + (e?.message || e?.name || "bilinmeyen hata");
 }
 async function sifrele(key, obj){
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -352,12 +415,16 @@ function kurulumEkrani(){
 function acEkrani(){
   app.innerHTML = `<main class="center"><div class="card">
     <h1 style="margin:0 0 4px;font-size:20px">Kasa kilitli</h1>
-    <label>Kasa parolası</label><input id="kp" type="password" autocomplete="current-password">
-    <button class="btn" data-act="ac">Aç</button>
-    <button class="btn ghost" data-act="cikis">Hesaptan çıkış</button>
+    ${fidHazir() ? `<button class="btn" data-act="fidAc" style="font-size:17px;padding:16px">Face ID ile aç</button>
+      <details style="margin-top:14px"><summary class="muted" style="cursor:pointer">Parola ile aç</summary>
+        <label>Kasa parolası</label><input id="kp" type="password" autocomplete="current-password">
+        <button class="btn ghost" data-act="ac">Parolayla aç</button></details>`
+    : `<label>Kasa parolası</label><input id="kp" type="password" autocomplete="current-password">
+      <button class="btn" data-act="ac">Aç</button>`}
     <div class="err" id="err"></div>
+    <button class="btn ghost" data-act="cikis">Hesaptan çıkış</button>
   </div></main>`;
-  setTimeout(()=>document.getElementById("kp")?.focus(), 50);
+  if (!fidHazir()) setTimeout(()=>document.getElementById("kp")?.focus(), 50);
 }
 
 function fiyatSeridi(){
@@ -381,7 +448,7 @@ function ozet(){
   const grup = {}; for (const a of S.assets){ if (isBA(a)) continue; const d=degerTL(a); if (d!=null) grup[a.type]=(grup[a.type]||0)+d; }
   const top = Object.values(grup).reduce((x,y)=>x+y,0) || 1;
   const sira = Object.entries(grup).sort((a,b)=>b[1]-a[1]);
-  return `
+  return `${fidOneri()}
   <div class="card">
     <div class="muted">Net varlık</div>
     <div class="big">${para(t.net)}</div>
@@ -397,10 +464,31 @@ function ozet(){
   ${demo?"":ayarlar()}`;
 }
 
+function fidOneri(){
+  if (demo || !fidDestek() || fidHazir()) return "";
+  if (lsGet("fidOneriGizle:"+kasaId) === "1") return "";
+  const bekliyor = fidKayit()?.cid;
+  return `<div class="card" style="border-color:var(--acc)">
+    <div><b>${bekliyor ? "Face ID kurulumunu tamamlayın" : "Bir dahaki sefere Face ID ile açın"}</b></div>
+    <p class="muted" style="margin:4px 0 0">${bekliyor ? "Son adım: Face ID'yi bir kez daha doğrulayın." : "Parola yazmadan, tek dokunuşla. Şifreleme aynen kalır; parolanız yedek olarak geçerli."}</p>
+    <div style="display:flex;gap:8px"><button class="btn" style="flex:2" data-act="${bekliyor?"fidDogrula":"fidAc1"}">${bekliyor?"Face ID'yi doğrula":"Face ID'yi aç"}</button>
+    <button class="btn ghost" style="flex:1" data-act="fidGec">Şimdi değil</button></div>
+  </div>`;
+}
+function fidAyar(){
+  if (demo) return "";
+  const hazir = fidHazir(), bekliyor = !hazir && fidKayit()?.cid;
+  return `<div class="card"><div><b>Face ID ile açma</b> <span class="muted">· bu cihaz</span></div>
+    <p class="muted" style="margin:4px 0 0">${!fidDestek() ? "Bu tarayıcı desteklemiyor." : hazir ? "Açık. Kasa açılırken Face ID kullanılır; parola yedek olarak geçerli." : bekliyor ? "Kurulum yarım kaldı." : "Kapalı."}</p>
+    ${!fidDestek() ? "" : hazir ? `<button class="btn ghost" data-act="fidKapat">Face ID ile açmayı kapat</button>`
+      : bekliyor ? `<button class="btn ghost" data-act="fidDogrula">Face ID'yi doğrula</button>` : `<button class="btn ghost" data-act="fidAc1">Face ID'yi aç</button>`}
+  </div>`;
+}
 function ayarlar(){
   const son = kasaDoc?.updatedAt ? `Son değişiklik: ${new Date(kasaDoc.updatedAt).toLocaleString("tr-TR")}${kasaDoc.guncelleyen?" · "+esc(kasaDoc.guncelleyen):""}` : "";
   const uyeler = kasaDoc?.uyeler || [];
   return `<h2>Ayarlar</h2>
+  ${fidAyar()}
   <div class="card">
     <div><b>${sahipMi()?"Kasa sizin":"Paylaşılan kasa"}</b></div>
     <div class="muted">${esc(benEmail)}${son?"<br>"+son:""}</div>
@@ -597,7 +685,26 @@ document.addEventListener("click", async e => {
         screen="app"; tab="ozet"; render(); fiyatlariAl(); dinle();
       } catch { key=null; t.disabled=false; t.textContent="Aç"; err("Parola yanlış."); }
     }
-    if (act==="cikis" || act==="cikisApp"){ dinlemeyiBirak(); key=null; S=null; await FB.signOut(auth); }
+    if (act==="fidAc"){
+      t.disabled=true; t.textContent="Açılıyor…";
+      try { await faceIdAc(); screen="app"; tab="ozet"; render(); fiyatlariAl(); dinle(); }
+      catch(ex){ key=null; anahtarHam=null; t.disabled=false; t.textContent="Face ID ile aç";
+        if (ex?.name==="OperationError") { fidSil(); render(); err("Face ID kaydı geçersiz oldu. Parolayla açıp yeniden etkinleştirin."); }
+        else err(fidHata(ex)); }
+    }
+    if (act==="fidAc1"){
+      t.disabled=true;
+      try { const tamam = await faceIdEtkinlestir(); render(); toast(tamam ? "Face ID açıldı" : "Son adım: \"Face ID'yi doğrula\"ya basın"); }
+      catch(ex){ t.disabled=false; toast(fidHata(ex)); }
+    }
+    if (act==="fidDogrula"){
+      t.disabled=true;
+      try { await faceIdDogrula(); render(); toast("Face ID açıldı"); }
+      catch(ex){ t.disabled=false; toast(fidHata(ex)); }
+    }
+    if (act==="fidKapat"){ fidSil(); render(); toast("Face ID ile açma kapatıldı"); }
+    if (act==="fidGec"){ lsSet("fidOneriGizle:"+kasaId, "1"); render(); }
+    if (act==="cikis" || act==="cikisApp"){ fidSil(); dinlemeyiBirak(); key=null; S=null; await FB.signOut(auth); }
     if (act==="uyeEkle") await uyeEkle(document.getElementById("uyeMail").value);
     if (act==="uyeSil") await uyeSil(t.dataset.mail);
     if (act==="parolaDegis"){
@@ -606,7 +713,7 @@ document.addEventListener("click", async e => {
       if (p1!==p2) return toast("Parolalar aynı değil");
       if (!confirm("Kasa parolası değişsin mi? Yeni parolayı mutlaka not edin.")) return;
       salt = crypto.getRandomValues(new Uint8Array(16)); key = await anahtarUret(p1, salt);
-      await kaydet(true); render(); toast("Parola değiştirildi");
+      await kaydet(true); const vardi = !!fidKayit(); fidSil(); render(); toast(vardi ? "Parola değiştirildi. Face ID'yi yeniden açın." : "Parola değiştirildi");
     }
     if (act==="kilitle") kilitle();
     if (act==="gizle"){ gizli=!gizli; lsSet("gizle",gizli?"1":"0"); render(); }
@@ -654,7 +761,7 @@ function hataMetni(e){
 
 /* ============ Kilit ============ */
 function kilitle(){
-  dinlemeyiBirak(); key=null; S=null; draft=null;
+  dinlemeyiBirak(); key=null; anahtarHam=null; S=null; draft=null;
   if (demo){ demo=false; screen="login"; } else screen="unlock";
   render();
 }
