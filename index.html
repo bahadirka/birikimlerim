@@ -104,8 +104,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 21; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 22; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:22, t:"2026-11-06", n:["Kâr/zarar varlığın kendi para biriminde hesaplanır: döviz fonlarında USD/EUR, TL fonlarda TL","Döviz fonlarında fonun döviz fiyatı TEFAS fiyatı ve TCMB kuruyla bulunur; banka ekranıyla aynı sonuç","Yüzdenin altında kâr/zarar tutarı da yazar (ör. +$14.189)"]},
   {s:21, t:"2026-11-06", n:["Alış maliyeti \"Toplam ödediğim\" ya da \"Pay/adet başı fiyat\" olarak girilebilir","Listede kâr/zarar açıkça \"kâr\" / \"zarar\" diye yazar; mantıksız büyük oranlarda \"maliyeti kontrol edin\" uyarısı çıkar"]},
   {s:20, t:"2026-11-06", n:["Kripto: konum \"Kripto borsası\" seçilince hangi borsa olduğu seçilebilir (Binance, BtcTurk, Paribu ve diğerleri); listede görünür"]},
   {s:19, t:"2026-11-06", n:["Döviz fonları: fon ve BES eklerken tutar USD ya da EUR olarak girilebilir; listede döviz karşılığı da görünür"]},
@@ -381,6 +382,27 @@ function netHesap(){
   for (const a of S.assets) if (isBA(a)) { const d=degerTL(a); if (d==null) { eksik++; continue; } if (a.type==="alacak") alacak+=d; else borc+=d; }
   return {varlik:t.v, alacak, borc, net:t.v+alacak-borc, eksik, kz:t.kz, kzOran:t.kzOran};
 }
+/* Kâr/zarar varlığın KENDİ para biriminde: döviz fonunda fonun döviz fiyatı = TEFAS TL fiyatı ÷ önceki iş gününün TCMB döviz alış kuru */
+function tcmbKur(tarih, pb){
+  const t = canli?.tcmb; if (!t || pb==="TRY") return null;
+  const gunler = Object.keys(t).filter(g => g < tarih && t[g]?.[pb]?.da).sort();
+  return gunler.length ? t[gunler[gunler.length-1]][pb].da : null;
+}
+const kzPB = a => (a.type==="fon"||a.type==="bes") ? (a.tutarCur && a.tutarCur!=="TRY" ? a.tutarCur : (a.costCur||"TRY")) : (a.costCur||"TRY");
+function kzHesap(a){
+  if (a.type==="mevduat"){ const m=mevduatHesap(a), pb=a.cur||"TRY"; return m.ana ? {pb, oran:(m.simdi/m.ana-1)*100, tutar:m.simdi-m.ana} : null; }
+  const c = sayi(a.cost); if (c==null || !c) return null;
+  const pb = kzPB(a), qty = +a.qty||0;
+  let maliyet;
+  if ((a.costCur||"TRY")===pb) maliyet = a.costTip==="birim" ? c*qty : c;
+  else { const mt = maliyetTL(a), k = kurTL(pb); if (mt==null || !k) return null; maliyet = mt/k; }
+  let deger = null;
+  const cf = canliFiyat(a);
+  if ((a.type==="fon"||a.type==="bes") && pb!=="TRY" && cf){ const k = tcmbKur(cf.t, pb) || kurTL(pb); if (k) deger = cf.p/k*qty; }
+  if (deger==null){ const d = degerTL(a), k = kurTL(pb); if (d==null || !k) return null; deger = d/k; }
+  return {pb, oran:(deger/maliyet-1)*100, tutar:deger-maliyet};
+}
+const pbFmt = pb => pb==="USD" ? fUSD : pb==="EUR" ? fEUR : fTL;
 function toplam(list){ let v=0, eksik=0, mal=0, malDeger=0; for (const a of list){ if (isBA(a)) continue; const d=degerTL(a); if (d==null) { eksik++; continue; } v+=d; const c=maliyetTL(a); if (c!=null){ mal+=c; malDeger+=d; } } return {v, eksik, kz: mal ? malDeger-mal : null, kzOran: mal ? (malDeger-mal)/mal*100 : null}; }
 
 function gunlukKayit(){
@@ -846,13 +868,12 @@ function miktar(a){
   return q+" adet";
 }
 function satir(a){
-  const d = degerTL(a), c = maliyetTL(a);
-  const kz = (d!=null && c) ? (d-c)/c*100 : null;
+  const d = degerTL(a), kh = kzHesap(a), kz = kh ? kh.oran : null;
   const cf = canliFiyat(a), elle = !cf && ["bist","abd","fon","bes"].includes(a.type);
   return `<div class="row tap" data-edit="${esc(a.id)}">
     <div><div>${esc(etiket(a))}${a.konum==="kasa"?'<span class="tag">kasa</span>':""}</div>
     <div class="muted">${miktar(a)}${cf?` · <span class="pos">canlı</span> ${a.type==="abd"?"$"+fN.format(cf.p):fN.format(cf.p)+" TL"}${cf.ch!=null?` <span class="${cf.ch>=0?"pos":"neg"}">${cf.ch>=0?"+":""}${cf.ch}%</span>`:""}${a.type==="fon"||a.type==="bes"?" · "+esc(cf.t||""):""}`:""}${elle?` · elle fiyat${a.fiyatCur&&a.fiyatCur!=="TRY"?" ("+a.fiyatCur+")":""}${a.priceDate?" · "+esc(a.priceDate):""}`:""}${a.konum==="borsa"&&a.borsaAd?" · "+esc(a.borsaAd):""}${a.konumNot?" · "+esc(a.konumNot):""}</div></div>
-    <div class="r"><div>${para(d)}</div>${(a.tutarCur&&a.tutarCur!=="TRY"&&d!=null&&kurTL(a.tutarCur))?`<div class="muted">≈ ${para(d/kurTL(a.tutarCur), a.tutarCur==="USD"?fUSD:fEUR)}</div>`:""}${kz!=null?(Math.abs(kz)>1000?`<div class="muted" style="font-size:12px">maliyeti kontrol edin</div>`:`<div class="${kz>=0?"pos":"neg"}" style="font-size:13px">${gizli?"":yuzde(kz,1)+(kz>=0?" kâr":" zarar")}</div>`):""}</div>
+    <div class="r"><div>${para(d)}</div>${(()=>{ if (!(a.tutarCur&&a.tutarCur!=="TRY"&&d!=null)) return ""; const k = (cf && tcmbKur(cf.t, a.tutarCur)) || kurTL(a.tutarCur); return k ? `<div class="muted">≈ ${para(d/k, a.tutarCur==="USD"?fUSD:fEUR)}</div>` : ""; })()}${kz!=null?(Math.abs(kz)>1000?`<div class="muted" style="font-size:12px">maliyeti kontrol edin</div>`:`<div class="${kz>=0?"pos":"neg"}" style="font-size:13px">${gizli?"":yuzde(kz,2)+(kz>=0?" kâr":" zarar")}</div><div class="${kz>=0?"pos":"neg"}" style="font-size:12px">${gizli?"••••":(kh.tutar>=0?"+":"−")+pbFmt(kh.pb).format(Math.abs(kh.tutar))}</div>`):""}</div>
   </div>`;
 }
 
