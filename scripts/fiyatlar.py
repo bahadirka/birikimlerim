@@ -78,6 +78,49 @@ try:
 except Exception as e:
     out["hata"].append(f"seri: {e}")
 
+# ---------- Dokununca açılan grafikler: gün / hafta / yıl ----------
+def grafikler():
+    import yfinance as yf
+    g = out["grafik"] = {}
+    def tv(c, adim=1):
+        c = c.dropna()
+        if adim > 1: c = c.iloc[::adim].combine_first(c.iloc[-1:]) if len(c) else c
+        return {"t": [int(i.timestamp()) for i in c.index], "v": [round(float(x), 4) for x in c.tolist()]}
+    try:
+        h = yf.download(list(SERI.values()), period="5d", interval="15m", group_by="ticker", progress=False, threads=True, auto_adjust=False)
+        y = yf.download(list(SERI.values()), period="1y", interval="1d", group_by="ticker", progress=False, threads=True, auto_adjust=False)
+    except Exception as e:
+        out["hata"].append(f"grafik: {e}"); return
+    for k, t in SERI.items():
+        try:
+            ch, cy = h[t]["Close"].dropna(), y[t]["Close"].dropna()
+            son = ch.index[-1].date() if len(ch) else None
+            gun = ch[[i.date() == son for i in ch.index]] if son else ch
+            if len(gun) < 4: gun = ch.iloc[-32:]
+            g[k] = {"gun": tv(gun), "hafta": tv(ch, 2), "yil": tv(cy)}
+        except Exception:
+            pass
+    def bilesik(ad, a, b, bol):
+        if a not in g or b not in g: return
+        g[ad] = {}
+        for r in ("gun", "hafta", "yil"):
+            A, B = g[a][r], g[b][r]
+            bmap = dict(zip(B["t"], B["v"]))
+            tt, vv, son_b = [], [], None
+            for ts, v in zip(A["t"], A["v"]):
+                son_b = bmap.get(ts, son_b)
+                if son_b is None:  # en yakın önceki kur
+                    oncekiler = [bv for bt, bv in zip(B["t"], B["v"]) if bt <= ts]
+                    son_b = oncekiler[-1] if oncekiler else (B["v"][0] if B["v"] else None)
+                if son_b: tt.append(ts); vv.append(round(v * son_b / bol, 3))
+            g[ad][r] = {"t": tt, "v": vv}
+    bilesik("GRAM", "ONS", "USD", 31.1035)
+    bilesik("GUMUS", "AGONS", "USD", 31.1035)
+try:
+    grafikler()
+except Exception as e:
+    out["hata"].append(f"grafik: {e}")
+
 # ---------- TEFAS (yatırım + emeklilik + borsa yatırım fonları, günlük) ----------
 # Eski /api/DB/* adresleri kapandı; yenisi JSON alır, tarih YYYYMMDD, satırlar "resultList" altında.
 TEFAS_URLLER = ["https://www.tefas.gov.tr/api/funds/fonGnlBlgSiraliGetirDosya",
