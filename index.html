@@ -64,8 +64,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 12; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 13; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:13, t:"2026-11-06", n:["Açılışta Google oturumu hatırlanıyor: oturum yüklenirken artık giriş ekranı gösterilmiyor","Giriş yaparken hesap seçme ekranı her seferinde sorulmuyor"]},
   {s:12, t:"2026-11-06", n:["Fon ve BES eklerken fonu adıyla arama (ör. \"AgeSA hisse\")","Pay adedi yerine bugünkü TL tutarı girilebilir; pay adedi TEFAS fiyatından hesaplanır ve değer her gün güncellenir"]},
   {s:11, t:"2026-11-06", n:["Face ID ile açma: kasa parolası yazmadan tek dokunuşla açılır (her cihazda bir kez etkinleştirilir)","Şifreleme aynen korunur; kasa parolası yedek olarak geçerli"]},
   {s:10, t:"2026-11-06", n:["Vadeli mevduat: banka, anapara, faiz oranı, başlangıç ve vade tarihi, stopaj","Brüt/net faiz, vade sonu tutarı ve işlemiş faizle bugünkü değer otomatik hesaplanır; bankanın verdiği vade sonu tutarı da girilebilir","Vadesine 7 gün kalan ve vadesi dolan mevduatlarda uyarı"]},
@@ -177,7 +178,7 @@ async function coz(key, iv, ct){
 }
 
 /* ============ Durum ============ */
-let screen = "login", tab = "ozet", draft = null, demo = false;
+let screen = CONFIGURED ? "yukleniyor" : "login", tab = "ozet", draft = null, demo = false;
 let uid = null, key = null, salt = null, kasaDoc = null, kasaId = null, benEmail = "", unsub = null;
 let S = null; // çözülmüş veri: {assets:[], snapshots:[]}
 let prices = { fx:{}, gold:{}, silver:{}, crypto:{}, updated:null, goldSrc:"" };
@@ -375,6 +376,7 @@ async function uyeSil(mail){
 const app = document.getElementById("app");
 
 function render(){
+  if (screen==="yukleniyor") { app.innerHTML = `<main class="center"><div class="card" style="text-align:center"><div style="font-size:20px;font-weight:700">Birikimlerim</div><p class="muted">Açılıyor…</p></div></main>`; return; }
   if (screen==="login") return loginEkrani();
   if (screen==="setup") return kurulumEkrani();
   if (screen==="unlock") return acEkrani();
@@ -698,7 +700,7 @@ document.addEventListener("click", async e => {
     if (act==="demo"){ demo=true; S=demoVeri(); screen="app"; render(); fiyatlariAl(); }
     if (act==="google"){
       t.disabled=true;
-      const p = new FB.GoogleAuthProvider(); p.setCustomParameters({prompt:"select_account"});
+      const p = new FB.GoogleAuthProvider(); p.setCustomParameters({});
       try { await FB.signInWithPopup(auth, p); }
       catch(ex){
         if (["auth/popup-blocked","auth/operation-not-supported-in-this-environment","auth/cancelled-popup-request"].includes(ex.code)) await FB.signInWithRedirect(auth, p);
@@ -888,6 +890,7 @@ yenilikleriGoster();
 setInterval(surumKontrol, 5*60*1000);
 document.addEventListener("visibilitychange", ()=>{ if (!document.hidden) surumKontrol(); });
 
+if (CONFIGURED) { FB.getRedirectResult(auth).catch(()=>{}); setTimeout(()=>{ if (screen==="yukleniyor"){ screen="login"; render(); } }, 8000); }
 render();
 </script>
 </body>
