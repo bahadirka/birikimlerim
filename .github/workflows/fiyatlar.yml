@@ -1,0 +1,35 @@
+name: Fiyatlar
+on:
+  schedule:
+    - cron: "7,37 6-16 * * 1-5"   # hafta içi 09:07–19:37 (TR) yarım saatte bir
+    - cron: "17 19 * * 1-5"       # akşam: TEFAS günlük fiyatları
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["scripts/**", ".github/workflows/fiyatlar.yml"]
+permissions:
+  contents: write
+concurrency:
+  group: fiyatlar
+  cancel-in-progress: false
+jobs:
+  topla:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q yfinance requests
+      - run: python scripts/fiyatlar.py /tmp/prices.json
+      - name: fiyatlar dalına yaz
+        run: |
+          cd /tmp && rm -rf yayin && mkdir yayin && cd yayin
+          git init -q -b fiyatlar
+          cp /tmp/prices.json .
+          git config user.name "fiyat-botu"
+          git config user.email "fiyat-botu@users.noreply.github.com"
+          git add prices.json
+          git commit -qm "fiyatlar $(date -u +%FT%TZ)"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" fiyatlar
