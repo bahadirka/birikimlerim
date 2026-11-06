@@ -39,6 +39,8 @@ def hisseler(semboller, ek, hedef):
 try:
     hisseler(liste("bist.txt"), ".IS", out["bist"])
     hisseler(liste("abd.txt"), "", out["abd"])
+    out["endeks"] = {}
+    hisseler(["XU100.IS", "XU030.IS", "^GSPC", "^IXIC", "^DJI"], "", out["endeks"])
 except Exception as e:
     out["hata"].append(f"hisse: {e}")
 
