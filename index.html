@@ -50,6 +50,9 @@ main a{color:var(--acc)}
 .chg{font-size:12px;margin-top:2px;display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline}
 .chg .up,.tick.up{color:var(--pos);font-weight:600}.chg .down,.tick.down{color:var(--neg);font-weight:600}
 .tick{font-size:11px}
+.gunluk{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:12px;margin-top:3px;align-items:baseline}
+.gunluk .pos,.gunluk .neg{font-weight:600}
+.gunluk.buyuk{font-size:14px;margin:0}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .seg button{background:none;border:0;padding:5px 10px;font:inherit;font-size:12px;color:var(--muted);cursor:pointer}
 .seg .segon{background:var(--acc);color:#fff;font-weight:600}
@@ -104,8 +107,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 26; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 27; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:27, t:"2026-11-07", n:["Bugünkü kâr/zarar: her varlıkta, her kategori başlığında ve Özet'te TL ve USD olarak tutar ve yüzde","Fonlarda günlük değişim TEFAS'ın son iki fiyatından hesaplanır"]},
   {s:26, t:"2026-11-07", n:["Hisse eklerken şirket adıyla arama (ör. \"google\" → GOOGL, \"türk hava\" → THYAO)","Listede hisselerin yanında şirket adı görünür"]},
   {s:25, t:"2026-11-07", n:["Yüksek kârlarda (ör. uzun süre tutulan BTC) yanlış \"maliyeti kontrol edin\" uyarısı kaldırıldı; gerçek kâr yüzdesi ve tutarı gösterilir","Düzenleme ekranında girilen maliyetle hesaplanan kâr önizlemesi"]},
   {s:24, t:"2026-11-06", n:["Kripto ve ABD hisselerinde dolar karşılığı (ve 1 coin'in dolar fiyatı) görünür; kategori başlığında dolar toplamı"]},
@@ -306,7 +310,7 @@ async function fiyatlariAl(){
   try {
     const r = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${all.join(",")}&vs_currencies=try,usd&include_24hr_change=true`);
     const j = await r.json();
-    for (const id of all) if (j[id]) prices.crypto[id] = {try:j[id].try, usd:j[id].usd, ch:j[id].try_24h_change};
+    for (const id of all) if (j[id]) prices.crypto[id] = {try:j[id].try, usd:j[id].usd, ch:j[id].try_24h_change, chUsd:j[id].usd_24h_change};
     prices.ch = prices.ch || {};
     if (j.bitcoin?.try_24h_change!=null) prices.ch.btc = j.bitcoin.try_24h_change;
     if (j.bitcoin?.usd_24h_change!=null) prices.ch.btcUSD = j.bitcoin.usd_24h_change;
@@ -403,6 +407,40 @@ function usdKarsilik(a, d){
   const u = usdDeger(a); if (u==null) return "";
   const birim = a.type==="kripto" ? prices.crypto[cgId(a.symbol)]?.usd : null;
   return `<div style="font-size:14px;font-weight:600">${para(u, fUSD2)}</div>${birim?`<div class="muted" style="font-size:11px">1 ${esc(String(a.symbol||"").toUpperCase())} = ${fUSD2.format(birim)}</div>`:""}`;
+}
+/* Bugünkü kâr/zarar: bugünkü değer (Vt) ile dünkü değer (Vy), TL ve USD olarak */
+function gunlukHesap(a){
+  const Vt = degerTL(a); if (Vt==null || !Vt) return null;
+  const kU = prices.fx.USD; if (!kU) return null;
+  const chU = prices.ch?.USD ?? 0, kUy = kU/(1+chU/100);
+  const bol = ch => (ch==null || !isFinite(ch)) ? null : 1+ch/100;
+  let Vy = null;
+  switch(a.type){
+    case "abd": { const c=canliFiyat(a); const f=bol(c?.ch); if (f) Vy = (Vt/kU)/f*kUy; break; }
+    case "kripto": { const f=bol(prices.crypto[cgId(a.symbol)]?.ch); if (f) Vy = Vt/f; break; }
+    case "bist": { const f=bol(canliFiyat(a)?.ch); if (f) Vy = Vt/f; break; }
+    case "fon": case "bes": { const f=bol(canliFiyat(a)?.ch); if (f) Vy = Vt/f; break; }
+    case "altin": { const f=bol(a.unit==="ceyrek"?prices.ch?.ceyrek:prices.ch?.gram24); if (f) Vy = Vt/f; break; }
+    case "gumus": { const f=bol(prices.ch?.gumus); if (f) Vy = Vt/f; break; }
+    case "nakit": { const c=a.cur||"TRY"; if (c==="TRY") Vy = Vt; else { const f=bol(prices.ch?.[c]); if (f) Vy = Vt/f; } break; }
+    case "mevduat": { const m=mevduatHesap(a), k=kurTL(a.cur); if (m.gunToplam && m.kalan>0 && k) Vy = Vt - m.netFaiz/m.gunToplam*k; else Vy = Vt; break; }
+  }
+  if (Vy==null) return null;
+  const tl = Vt-Vy, ut = Vt/kU, uy = Vy/kUy;
+  return {tl, tlY:(Vt/Vy-1)*100, usd:ut-uy, usdY:(ut/uy-1)*100, Vt, Vy, ut, uy};
+}
+function gunlukToplam(list){
+  let Vt=0, Vy=0, ut=0, uy=0, n=0;
+  for (const a of list){ if (isBA(a)) continue; const g=gunlukHesap(a); if (!g) continue; Vt+=g.Vt; Vy+=g.Vy; ut+=g.ut; uy+=g.uy; n++; }
+  return n && Vy && uy ? {tl:Vt-Vy, tlY:(Vt/Vy-1)*100, usd:ut-uy, usdY:(ut/uy-1)*100} : null;
+}
+function gunlukHTML(g, buyuk){
+  if (!g) return "";
+  const p = (v, f) => gizli ? "••••" : (v>=0?"+":"−")+f.format(Math.abs(v));
+  const c = v => Math.abs(v)<1e-9 ? "muted" : v>0 ? "pos" : "neg";
+  return `<div class="gunluk${buyuk?" buyuk":""}"><span class="muted">${[0,6].includes(new Date().getDay())?"Son işlem günü":"Bugün"}</span>
+    <span class="${c(g.tl)}">${p(g.tl, fTL)} (${yuzde(g.tlY)})</span>
+    <span class="${c(g.usd)}">${p(g.usd, fUSD2)} (${yuzde(g.usdY)})</span></div>`;
 }
 function kzHesap(a){
   if (a.type==="mevduat"){ const m=mevduatHesap(a), pb=a.cur||"TRY"; return m.ana ? {pb, oran:m.netFaiz/m.ana*100, tutar:m.netFaiz, etiket:"vade sonu kârı"} : null; }
@@ -718,6 +756,7 @@ function ozet(){
     <div style="display:flex;justify-content:space-between;align-items:center"><div class="muted">Net varlık</div>
       <div class="seg">${Object.keys(PB).map(k=>`<button data-pb="${k}" class="${gosterPB===k?"on":""}">${PB[k].ad}</button>`).join("")}</div></div>
     <div class="big">${pbPara(t.net)}</div>
+    ${gunlukHTML(gunlukToplam(S.assets))}
     <div class="muted">${Object.keys(PB).filter(k=>k!==gosterPB).map(k=>"≈ "+pbPara(t.net,k)).join(" · ")}</div>
     ${(t.alacak||t.borc)?`<div class="muted">Varlıklar ${pbPara(t.varlik)} · Alacak <span class="pos">+${pbPara(t.alacak)}</span> · Borç <span class="neg">−${pbPara(t.borc)}</span></div>`:""}
     <div class="muted">
@@ -919,7 +958,7 @@ function satir(a){
   const cf = canliFiyat(a), elle = !cf && ["bist","abd","fon","bes"].includes(a.type);
   return `<div class="row tap" data-edit="${esc(a.id)}">
     <div><div>${esc(etiket(a))}${a.konum==="kasa"?'<span class="tag">kasa</span>':""}</div>
-    <div class="muted">${miktar(a)}${cf?` · <span class="pos">canlı</span> ${a.type==="abd"?"$"+fN.format(cf.p):fN.format(cf.p)+" TL"}${cf.ch!=null?` <span class="${cf.ch>=0?"pos":"neg"}">${cf.ch>=0?"+":""}${cf.ch}%</span>`:""}${a.type==="fon"||a.type==="bes"?" · "+esc(cf.t||""):""}`:""}${elle?` · elle fiyat${a.fiyatCur&&a.fiyatCur!=="TRY"?" ("+a.fiyatCur+")":""}${a.priceDate?" · "+esc(a.priceDate):""}`:""}${a.konum==="borsa"&&a.borsaAd?" · "+esc(a.borsaAd):""}${a.konumNot?" · "+esc(a.konumNot):""}</div></div>
+    <div class="muted">${miktar(a)}${cf?` · <span class="pos">canlı</span> ${a.type==="abd"?"$"+fN.format(cf.p):fN.format(cf.p)+" TL"}${a.type==="fon"||a.type==="bes"?" · "+esc(cf.t||""):""}`:""}${elle?` · elle fiyat${a.fiyatCur&&a.fiyatCur!=="TRY"?" ("+a.fiyatCur+")":""}${a.priceDate?" · "+esc(a.priceDate):""}`:""}${a.konum==="borsa"&&a.borsaAd?" · "+esc(a.borsaAd):""}${a.konumNot?" · "+esc(a.konumNot):""}</div>${gunlukHTML(gunlukHesap(a))}</div>
     <div class="r"><div>${para(d)}</div>${usdKarsilik(a, d)}${(()=>{ if (!(a.tutarCur&&a.tutarCur!=="TRY"&&d!=null)) return ""; const k = (cf && tcmbKur(cf.t, a.tutarCur)) || kurTL(a.tutarCur); return k ? `<div class="muted">≈ ${para(d/k, a.tutarCur==="USD"?fUSD:fEUR)}</div>` : ""; })()}${kz!=null?(false?``:`<div class="${kz>=0?"pos":"neg"}" style="font-size:13px">${gizli?"":yuzde(kz,2)+(kz>=0?" kâr":" zarar")}</div><div class="${kz>=0?"pos":"neg"}" style="font-size:12px">${gizli?"••••":(kh.tutar>=0?"+":"−")+pbFmt(kh.pb).format(Math.abs(kh.tutar))}</div>${kh.etiket?`<div class="muted" style="font-size:11px">${kh.etiket}</div>`:""}`):""}</div>
   </div>`;
 }
@@ -930,7 +969,8 @@ function varliklar(){
   return ust + Object.keys(TYPES).filter(k=>k!=="alacak"&&k!=="borc"&&(!filtre||k===filtre)).map(k=>{
     const l = S.assets.filter(a=>a.type===k); if (!l.length) return "";
     const usdT = (k==="kripto"||k==="abd") ? l.reduce((x,a)=>x+(usdDeger(a)||0),0) : 0;
-    return `<h2>${TYPES[k].ad} · ${para(toplam(l).v)}${usdT?` · ${para(usdT, fUSD)}`:""}</h2><div class="card">${l.map(satir).join("")}</div>`;
+    const gt = gunlukToplam(l);
+    return `<h2>${TYPES[k].ad} · ${para(toplam(l).v)}${usdT?` · ${para(usdT, fUSD)}`:""}</h2>${gt?`<div class="card" style="padding:10px 14px">${gunlukHTML(gt, true)}</div>`:""}<div class="card">${l.map(satir).join("")}</div>`;
   }).join("");
 }
 
