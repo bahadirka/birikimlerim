@@ -91,6 +91,9 @@ main a{color:var(--acc)}
 .bo-blok{margin-top:8px}
 .bo-cip{display:flex;flex-wrap:wrap;gap:5px}
 .bo-cip span{font-size:12px;border:1px solid;border-radius:7px;padding:2px 7px}
+.pasta-bilgi{border:1px solid;border-radius:12px;padding:10px 12px;margin:10px 0 4px}
+.pb-izgara{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin-top:8px;font-size:14px}
+.pb-izgara span{display:block;font-size:11px}
 .sirala{display:flex;gap:6px;align-items:center;overflow-x:auto;scrollbar-width:none;margin:0 -16px 4px;padding:2px 16px 6px}
 .sirala::-webkit-scrollbar{display:none}
 .sirala span{flex:none;font-size:12px}
@@ -162,8 +165,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 47; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 48; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:48, t:"2026-11-07", n:["Dilim grafikte renge dokununca başka sayfaya gitmeden bilgisi açılır: kategori, toplam değer, portföy payı, kâr/zarar, dolar ve euro karşılığı","Alttaki satırlar eskisi gibi detay sayfasına götürür"]},
   {s:47, t:"2026-11-07", n:["İçe aktarma: dolar cinsinden maliyetler doğru para birimiyle gösterilir"]},
   {s:46, t:"2026-11-07", n:["İçe aktarma bağlantısı ABD hisse/ETF'lerini de ekleyebilir","Yeni ABD kodları: PALL, PPLT, REMX, SPPP, COPX, SETM, OKLO, EMXC, EWZ, EWY"]},
   {s:45, t:"2026-11-07", n:["BIST hisselerinin altında hisse özeti: kaç farklı hisse, kaçı BIST 30 / BIST 100'de, kaçı endeks dışı ve değer payları (Ekim–Aralık 2026 listeleri)","Fon karşılaştırmasında TL / USD bazında seçimi; portföyünüzdeki aynı para birimli diğer fonlar da aynı grafikte (ör. dolar fonlarınız birbiriyle)"]},
@@ -1285,7 +1289,9 @@ function ozet(){
   <h2>Piyasa</h2>${fiyatSeridi()}`;
 }
 
-/* Dilim grafik: kategoriye dokununca Varlıklar o kategoriyle açılır */
+/* Dilim grafik: dilime dokununca bilgisi burada görünür; alttaki satırlar detay sayfasına gider */
+let pastaSecili = null;
+document.addEventListener("click", e => { const d = e.target.closest("[data-dilim]"); if (!d) return; e.stopPropagation(); pastaSecili = pastaSecili===d.dataset.dilim ? null : d.dataset.dilim; render(); }, true);
 function pasta(grup, top){
   const dil = PASTA_SIRA.filter(k=>grup[k]>0).map(k=>({k, v:grup[k], o:grup[k]/top}));
   const R=92, r=58, C=100;
@@ -1294,17 +1300,36 @@ function pasta(grup, top){
   for (const d of dil){
     const a1 = a0 + d.o*2*Math.PI;
     if (dil.length===1){
-      yollar += `<circle cx="${C}" cy="${C}" r="${(R+r)/2}" fill="none" stroke="${renkOf(d.k)}" stroke-width="${R-r}" data-kat="${d.k}" style="cursor:pointer"><title>${TYPES[d.k].ad}</title></circle>`;
+      yollar += `<circle cx="${C}" cy="${C}" r="${(R+r)/2}" fill="none" stroke="${renkOf(d.k)}" stroke-width="${R-r}" data-dilim="${d.k}" style="cursor:pointer" opacity="${pastaSecili&&pastaSecili!==d.k?0.3:1}"><title>${TYPES[d.k].ad}</title></circle>`;
     } else {
       const [x0,y0]=nokta(a0,R),[x1,y1]=nokta(a1,R),[x2,y2]=nokta(a1,r),[x3,y3]=nokta(a0,r), b = (a1-a0)>Math.PI?1:0;
-      yollar += `<path d="M${x0.toFixed(2)},${y0.toFixed(2)} A${R},${R} 0 ${b} 1 ${x1.toFixed(2)},${y1.toFixed(2)} L${x2.toFixed(2)},${y2.toFixed(2)} A${r},${r} 0 ${b} 0 ${x3.toFixed(2)},${y3.toFixed(2)} Z" fill="${renkOf(d.k)}" stroke="var(--card)" stroke-width="2" stroke-linejoin="round" data-kat="${d.k}" style="cursor:pointer"><title>${TYPES[d.k].ad} %${(d.o*100).toFixed(1)}</title></path>`;
+      yollar += `<path d="M${x0.toFixed(2)},${y0.toFixed(2)} A${R},${R} 0 ${b} 1 ${x1.toFixed(2)},${y1.toFixed(2)} L${x2.toFixed(2)},${y2.toFixed(2)} A${r},${r} 0 ${b} 0 ${x3.toFixed(2)},${y3.toFixed(2)} Z" fill="${renkOf(d.k)}" stroke="var(--card)" stroke-width="2" stroke-linejoin="round" data-dilim="${d.k}" style="cursor:pointer" opacity="${pastaSecili&&pastaSecili!==d.k?0.3:1}"><title>${TYPES[d.k].ad} %${(d.o*100).toFixed(1)}</title></path>`;
     }
     a0 = a1;
   }
-  return `<div class="muted" style="margin-bottom:6px">Dağılım · dilime dokunun</div>
+  const sec = pastaSecili && dil.find(d=>d.k===pastaSecili);
+  if (pastaSecili && !sec) pastaSecili = null;
+  const st = sec ? toplam(S.assets.filter(a=>a.type===sec.k)) : null;
+  const merkez = sec
+    ? `<text x="100" y="84" text-anchor="middle" font-size="10" fill="${renkOf(sec.k)}" font-weight="700">${esc(TYPES[sec.k].ad)}</text>
+       <text x="100" y="104" text-anchor="middle" font-size="15" font-weight="700" fill="var(--fg)">${gizli?"••••":fKisa(sec.v)}</text>
+       <text x="100" y="122" text-anchor="middle" font-size="12" fill="var(--muted)">%${fN2.format(sec.o*100)}</text>`
+    : `<text x="100" y="94" text-anchor="middle" font-size="11" fill="var(--muted)">Varlıklar</text>
+       <text x="100" y="114" text-anchor="middle" font-size="15" font-weight="700" fill="var(--fg)">${gizli?"••••":fKisa(top)}</text>`;
+  const bilgi = sec ? `<div class="pasta-bilgi" style="border-color:${renkOf(sec.k)}">
+      <div class="row" style="padding:0;border:0"><b><span class="dot" style="background:${renkOf(sec.k)}"></span>${esc(TYPES[sec.k].ad)}</b><button class="iconbtn" data-dilim="${sec.k}" aria-label="Kapat">✕</button></div>
+      <div class="pb-izgara">
+        <div><span class="muted">Toplam değer</span><b>${para(sec.v)}</b></div>
+        <div><span class="muted">Portföy payı</span><b>%${fN2.format(sec.o*100)}</b></div>
+        <div><span class="muted">Kayıt sayısı</span><b>${S.assets.filter(a=>a.type===sec.k).length}</b></div>
+        <div><span class="muted">Kâr / zarar</span><b class="${st.kz==null?"muted":st.kz>=0?"pos":"neg"}">${st.kz==null?"maliyet yok":(gizli?"••••":(st.kz>=0?"+":"−")+para(Math.abs(st.kz)))+" ("+yuzde(st.kzOran)+")"}</b></div>
+        ${prices.fx.USD?`<div><span class="muted">Dolar karşılığı</span><b>${para(sec.v/prices.fx.USD, fUSD)}</b></div>`:""}
+        ${prices.fx.EUR?`<div><span class="muted">Euro karşılığı</span><b>${para(sec.v/prices.fx.EUR, fEUR)}</b></div>`:""}
+      </div></div>` : "";
+  return `<div class="muted" style="margin-bottom:6px">Dağılım · ${sec?"tekrar dokununca kapanır":"dilime dokunun"}</div>
   <svg viewBox="0 0 200 200" style="max-width:240px;margin:0 auto" role="img" aria-label="Varlık dağılımı">${yollar}
-    <text x="100" y="94" text-anchor="middle" font-size="11" fill="var(--muted)">Varlıklar</text>
-    <text x="100" y="114" text-anchor="middle" font-size="15" font-weight="700" fill="var(--fg)">${gizli?"••••":fKisa(top)}</text></svg>
+    ${merkez}</svg>
+  ${bilgi}
   <div style="margin-top:8px">${dil.slice().sort((x,y)=>y.v-x.v).map(d=>{
     const t = toplam(S.assets.filter(a=>a.type===d.k)), kz = t.kz, c = kz==null ? "" : kz>=0 ? "pos" : "neg";
     return `<div class="row tap" data-kat="${d.k}">
