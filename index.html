@@ -136,8 +136,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 32; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 33; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:33, t:"2026-11-07", n:["Piyasa Nabzı artık seçili aralığa göre hesaplanır: Gün içi, Haftalık, Aylık ve Yıllık görünüm ayrı puan verir"]},
   {s:32, t:"2026-11-07", n:["Piyasa Nabzı: grafik penceresinin altında 0–100 puanlı gösterge, durum (Aşırı korku … Aşırı coşku), trend, 200/50 günlük ortalama, RSI ve yıllık zirveye uzaklık","Tüm hisseler, endeksler, kripto, döviz ve emtia için 1 yıllık fiyat geçmişinden hesaplanır"]},
   {s:31, t:"2026-11-07", n:["Favori listesinde sıralama: satıra basılı tutup yukarı/aşağı sürükleyin","Fenerbahçe (FENER), Galatasaray (GSRAY), Beşiktaş (BJKAS) ve Trabzonspor (TSPOR) hisseleri eklendi"]},
   {s:30, t:"2026-11-07", n:["İzleme listesi sekmesi: kripto, hisseler (BIST/ABD), endeksler, döviz, emtia (ons altın/gümüş, Brent) ve fonlar","☆ ile favori listenizi oluşturun (şifreli kasada saklanır, eşinizle ortak)","Arama ve kategori düğmeleri; satıra dokununca grafik (Gün/Hafta/Ay/Yıl)","Özel Kasa artık Varlıklar sayfasının sağ üstünde"]},
@@ -642,18 +643,29 @@ function rsi14(v){
   return z===0 ? 100 : 100 - 100/(1+k/z);
 }
 const sig = (x, olcek) => 100/(1+Math.exp(-x/olcek)); // uzaklığı 0–100'e çevirir
-function nabizHesapla(v, guncel){
-  if (!v || v.length < 60) return null;
-  v = v.slice(); if (guncel && isFinite(guncel)) v.push(guncel);
-  const p = v[v.length-1], m50 = ort(v,50), m200 = ort(v, Math.min(200, v.length-1)), r = rsi14(v);
-  const yuk = Math.max(...v.slice(-252)), dus = Math.min(...v.slice(-252));
+/* Her aralık kendi verisiyle: Yıl = 50/200 günlük; Ay = 5/20 günlük; Hafta ve Gün = dönemin 1/5'i ve tamamı */
+const NABIZ_AYAR = {
+  yil:  {ad:"Yıllık görünüm", kisa:50, uzun:200, kAd:"50G ort.", uAd:"200G ort.", zAd:"1 yıllık zirve", o1:4, o2:8},
+  ay:   {ad:"Aylık görünüm", kisa:5, uzun:20, kAd:"5G ort.", uAd:"20G ort.", zAd:"Aylık zirve", o1:1.5, o2:3},
+  hafta:{ad:"Haftalık görünüm", kisa:null, uzun:null, kAd:"1G ort.", uAd:"5G ort.", zAd:"5 günlük zirve", o1:0.8, o2:1.6},
+  gun:  {ad:"Gün içi görünüm", kisa:null, uzun:null, kAd:"Son saatler ort.", uAd:"Gün içi ort.", zAd:"Gün içi zirve", o1:0.3, o2:0.6},
+};
+function nabizHesapla(v, guncel, mod="yil"){
+  const A = NABIZ_AYAR[mod];
+  if (!v || v.length < (mod==="yil"?60:12)) return null;
+  v = v.slice(); if (guncel && isFinite(guncel) && (mod==="yil"||mod==="ay")) v.push(guncel);
+  const n = v.length, kisa = A.kisa || Math.max(3, Math.round(n/5)), uzun = Math.min(A.uzun || n, n);
+  const p = v[n-1], m50 = ort(v, Math.min(kisa, n)), m200 = ort(v, uzun);
+  const rPer = Math.min(14, n-2), r = (()=>{ let k=0,z=0; for (let i=n-rPer;i<n;i++){ const d=v[i]-v[i-1]; if (d>0) k+=d; else z-=d; } return z===0 ? 100 : 100-100/(1+k/z); })();
+  const dilim = mod==="yil" ? v.slice(-252) : v;
+  const yuk = Math.max(...dilim), dus = Math.min(...dilim);
   const aralik = yuk>dus ? (p-dus)/(yuk-dus)*100 : 50;
   const u50 = m50 ? (p/m50-1)*100 : 0, u200 = m200 ? (p/m200-1)*100 : 0;
-  const parca = [r ?? 50, aralik, sig(u50, 4), sig(u200, 8)];
+  const parca = [r, aralik, sig(u50, A.o1), sig(u200, A.o2)];
   const puan = Math.max(0, Math.min(100, parca.reduce((a,b)=>a+b,0)/parca.length));
   const evre = NABIZ_EVRE.find(e => puan>=e[0] && puan<e[1]);
   const trend = (p>m50 && m50>m200) ? ["Yükseliş","yukari"] : (p<m50 && p<m200) ? ["Daralma","asagi"] : ["Kararsız","yatay"];
-  return {puan, evre, trend, p, m50, m200, r, yuk, dus, aralik, u50, u200, zirve:(p/yuk-1)*100, gun:v.length, kisa: v.length<200};
+  return {mod, A, puan, evre, trend, p, m50, m200, r, yuk, dus, aralik, u50, u200, zirve:(p/yuk-1)*100, kisa: mod==="yil" && n<200};
 }
 function nabizGosterge(puan){
   const R=70, C=90, Y=86, a = Math.PI*(1-puan/100);
@@ -668,27 +680,28 @@ function nabizHTML(n, f){
   if (!n) return `<div class="nb"><div class="nb-bas">Piyasa Nabzı</div><p class="muted" style="margin:6px 0 0">Hesaplanıyor…</p></div>`;
   if (n==="yok") return `<div class="nb"><div class="nb-bas">Piyasa Nabzı</div><p class="muted" style="margin:6px 0 0">Bu enstrüman için yeterli geçmiş veri yok.</p></div>`;
   const [ , , ad, , renk] = n.evre, F = x => x==null ? "—" : f.format(x);
-  const anlam = (n.p>n.m50 && n.p>n.m200 ? "Fiyat hem 50 hem 200 günlük ortalamanın üstünde."
-    : n.p<n.m50 && n.p<n.m200 ? "Fiyat hem 50 hem 200 günlük ortalamanın altında."
-    : n.p>n.m50 ? "Kısa vadede toparlanma var; fiyat hâlâ 200 günlük ortalamanın altında."
-    : "Uzun vadeli eğilim yukarı; kısa vadede geri çekilme var.")
+  const anlam = (n.p>n.m50 && n.p>n.m200 ? "Fiyat hem kısa hem uzun ortalamanın üstünde."
+    : n.p<n.m50 && n.p<n.m200 ? "Fiyat hem kısa hem uzun ortalamanın altında."
+    : n.p>n.m50 ? "Kısa vadede toparlanma var; fiyat hâlâ uzun ortalamanın altında."
+    : "Uzun eğilim yukarı; kısa vadede geri çekilme var.")
     + (n.r!=null && n.r>=70 ? " RSI aşırı alım bölgesinde." : n.r!=null && n.r<=30 ? " RSI aşırı satım bölgesinde." : "");
   const ok = {yukari:"↗", asagi:"↘", yatay:"→"}[n.trend[1]];
   const ust = (x) => x>=0 ? "üstünde" : "altında";
-  const metin = `Fiyat (${F(n.p)}) 200 günlük ortalamanın (${F(n.m200)}) %${fN2.format(Math.abs(n.u200))} ${ust(n.u200)}, 50 günlük ortalamanın (${F(n.m50)}) %${fN2.format(Math.abs(n.u50))} ${ust(n.u50)}. Son bir yılın zirvesinin (${F(n.yuk)}) %${fN2.format(Math.abs(n.zirve))} ${n.zirve>=-0.05?"yakınında":"altında"}; yıllık aralığın %${fN2.format(n.aralik)} seviyesinde. RSI-14: ${n.r==null?"—":fN2.format(n.r)}.`;
+  const donem = {yil:"son bir yılın", ay:"son bir ayın", hafta:"son 5 günün", gun:"günün"}[n.mod];
+  const metin = `Fiyat (${F(n.p)}) ${n.A.uAd.replace(" ort.","")} ortalamanın (${F(n.m200)}) %${fN2.format(Math.abs(n.u200))} ${ust(n.u200)}, ${n.A.kAd.replace(" ort.","")} ortalamanın (${F(n.m50)}) %${fN2.format(Math.abs(n.u50))} ${ust(n.u50)}. ${donem[0].toUpperCase()+donem.slice(1)} zirvesinin (${F(n.yuk)}) %${fN2.format(Math.abs(n.zirve))} ${n.zirve>=-0.05?"yakınında":"altında"}; dönem aralığının %${fN2.format(n.aralik)} seviyesinde. RSI: ${fN2.format(n.r)}.`;
   return `<div class="nb">
-    <div class="nb-bas">Piyasa Nabzı</div>
+    <div class="nb-bas">Piyasa Nabzı · ${n.A.ad}</div>
     <div style="position:relative">${nabizGosterge(n.puan)}<div class="nb-puan">${fN2.format(n.puan)}<small>PUAN</small></div></div>
     <div class="nb-evre" style="border-color:${renk}"><div class="muted nb-k">Durum</div><div class="nb-ad" style="color:${renk}">${ad}</div><div>${anlam}</div></div>
     <div class="nb-izgara">
       <div><div class="muted nb-k">Trend</div><b class="${n.trend[1]==="yukari"?"pos":n.trend[1]==="asagi"?"neg":""}">${ok} ${n.trend[0]}</b></div>
-      <div><div class="muted nb-k">1 yıllık zirve</div><b>${F(n.yuk)}</b></div>
-      <div><div class="muted nb-k">200G ort.</div><b>${F(n.m200)}</b></div>
-      <div><div class="muted nb-k">RSI-14</div><b>${n.r==null?"—":fN2.format(n.r)}</b></div>
+      <div><div class="muted nb-k">${n.A.zAd}</div><b>${F(n.yuk)}</b></div>
+      <div><div class="muted nb-k">${n.A.uAd}</div><b>${F(n.m200)}</b></div>
+      <div><div class="muted nb-k">RSI</div><b>${fN2.format(n.r)}</b></div>
     </div>
     <p style="font-size:13px;margin:10px 0 0">${metin}</p>
     <div class="nb-cubuk">${NABIZ_EVRE.map(e=>`<span class="${e===n.evre?"on":""}" style="--r:${e[4]}">${e[2]}</span>`).join("")}</div>
-    <p class="muted" style="font-size:11px;margin:8px 0 0">${n.kisa?"200 günden kısa geçmiş: uzun ortalama mevcut verinin tamamından hesaplandı. ":""}Bu gösterge yalnızca fiyatın son bir yıldaki kendi geçmişine göre konumunu özetler; yatırım tavsiyesi değildir.</p>
+    <p class="muted" style="font-size:11px;margin:8px 0 0">${n.kisa?"200 günden kısa geçmiş: uzun ortalama mevcut verinin tamamından hesaplandı. ":""}Gösterge, seçili aralıktaki (Gün / Hafta / Ay / Yıl) fiyat geçmişine göre konumu özetler; aralık değişince puan da değişir. Yatırım tavsiyesi değildir.</p>
   </div>`;
 }
 async function grafikAc(k, r="gun"){
@@ -696,12 +709,7 @@ async function grafikAc(k, r="gun"){
   grafikDurum = {k, r, t:[], v:[], yukleniyor:true}; grafikCiz();
   const d = await grafikVeri(k, r);
   if (!grafikDurum || grafikDurum.k!==k || grafikDurum.r!==r) return;
-  grafikDurum = {k, r, ...(d||{t:[],v:[]}), yukleniyor:false, nabiz: nabizOnbellek[k]}; grafikCiz();
-  if (!nabizOnbellek[k]) {
-    const y = r==="yil" ? d : await grafikVeri(k, "yil");
-    nabizOnbellek[k] = nabizHesapla(y?.v, izBul(k)?.v) || "yok";
-    if (grafikDurum && grafikDurum.k===k){ grafikDurum.nabiz = nabizOnbellek[k]; grafikCiz(); }
-  }
+  grafikDurum = {k, r, ...(d||{t:[],v:[]}), yukleniyor:false, nabiz: nabizHesapla(d?.v, izBul(k)?.v, r) || "yok"}; grafikCiz();
 }
 function grafikKapat(){ grafikDurum=null; document.getElementById("grafikPencere")?.remove(); }
 function grafikCiz(){
