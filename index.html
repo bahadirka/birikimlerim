@@ -136,8 +136,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 33; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 34; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:34, t:"2026-11-07", n:["Sanal İşlem (paper trading): 1.000.000 TL + 20.000 $ sanal bakiyeyle gerçek para olmadan al/sat","Kural koyma: fiyat bir seviyenin üstüne çıkarsa / altına düşerse otomatik sanal al veya sat","Zarar kes / kâr al, açık pozisyonlar, kâr/zarar ve işlem geçmişi","İzleme listesinden ya da grafik penceresindeki \"Sanal işlem yap\" düğmesinden açılır"]},
   {s:33, t:"2026-11-07", n:["Piyasa Nabzı artık seçili aralığa göre hesaplanır: Gün içi, Haftalık, Aylık ve Yıllık görünüm ayrı puan verir"]},
   {s:32, t:"2026-11-07", n:["Piyasa Nabzı: grafik penceresinin altında 0–100 puanlı gösterge, durum (Aşırı korku … Aşırı coşku), trend, 200/50 günlük ortalama, RSI ve yıllık zirveye uzaklık","Tüm hisseler, endeksler, kripto, döviz ve emtia için 1 yıllık fiyat geçmişinden hesaplanır"]},
   {s:31, t:"2026-11-07", n:["Favori listesinde sıralama: satıra basılı tutup yukarı/aşağı sürükleyin","Fenerbahçe (FENER), Galatasaray (GSRAY), Beşiktaş (BJKAS) ve Trabzonspor (TSPOR) hisseleri eklendi"]},
@@ -383,7 +384,7 @@ async function fiyatlariAl(){
     ekle("gumus", tch(j,"gumus")); ekle("USD", tch(j,"USD")); ekle("EUR", tch(j,"EUR")); ekle("GBP", tch(j,"GBP"));
     ok = true;
   } catch(e) {}
-  if (ok) { prices.updated = new Date(); anlikHesapla(); gunlukKayit(); }
+  if (ok) { prices.updated = new Date(); anlikHesapla(); gunlukKayit(); sanalKontrol(); }
   if (screen==="app") render();
 }
 
@@ -529,7 +530,7 @@ function render(){
   <header><h1>Birikimlerim${demo?' <span class="tag">DEMO</span>':''}</h1>
     <div><button class="iconbtn" data-act="gizle">${gizli?"Göster":"Gizle"}</button><button class="iconbtn" data-act="kilitle">Kilitle</button>${demo?"":`<button class="iconbtn ${tab==="ayarlar"?"on":""}" data-tab="ayarlar" aria-label="Ayarlar" style="font-size:16px">⚙︎</button>`}</div>
   </header>
-  <main>${tab==="ozet"?ozet():tab==="varlik"?varliklar():tab==="kasa"?kasa():tab==="izle"?izleme():tab==="ba"?borcAlacak():tab==="ayarlar"?ayarlar():form()}</main>
+  <main>${tab==="ozet"?ozet():tab==="varlik"?varliklar():tab==="kasa"?kasa():tab==="izle"?izleme():tab==="sanal"?sanal():tab==="ba"?borcAlacak():tab==="ayarlar"?ayarlar():form()}</main>
   <nav>${[["ozet","Özet"],["varlik","Varlıklar"],["izle","İzleme"],["ba","Borç/Alacak"],["ekle",draft?.id?"Düzenle":"Ekle"]].map(([k,l])=>`<button data-tab="${k}" class="${tab===k?"on":""}">${l}</button>`).join("")}</nav>`;
 }
 
@@ -746,6 +747,7 @@ function grafikCiz(){
     <div class="gp-fiyat" id="gpFiyat">${d0.v==null?"—":f.format(d0.v)}</div>
     <div class="gp-alt" id="gpAlt">${deg||"&nbsp;"}</div>
     ${govde}
+    ${sanalIslenebilir(G.k)?`<button class="btn ghost" style="margin-top:10px" data-snac="${esc(G.k)}">Sanal işlem yap</button>`:""}
     <div class="seg" style="display:flex;margin-top:10px">${ARALIK.map(([k,l])=>`<button style="flex:1" data-gp="${k}" class="${G.r===k?"on":""}">${l}</button>`).join("")}</div>
     ${["gram24","ceyrek","gumus"].includes(G.k)?'<p class="muted" style="font-size:11px;margin:8px 0 0">Eğri dünya ons fiyatı × dolar kurundan çizilir; seviye bugünkü fiyata göre ayarlanır.</p>':""}
     ${["XU100","XU030","GSPC","IXIC","USD","EUR"].includes(G.k)?'<p class="muted" style="font-size:11px;margin:8px 0 0">Veri yaklaşık 15 dk gecikmeli; yarım saatte bir güncellenir.</p>':""}
@@ -857,7 +859,7 @@ function izListeHTML(){
 function izListeYenile(){ const el = document.getElementById("izListe"); if (el) el.innerHTML = izListeHTML(); const s = document.getElementById("izSay"); if (s) s.textContent = izFavori().length+" favori"; }
 function izleme(){
   kriptoAl();
-  return `<div class="iz-ust"><div><div style="font-size:22px;font-weight:700">İzleme listesi</div><div class="muted" id="izSay">${izFavori().length} favori</div></div></div>
+  return `<div class="iz-ust"><div><div style="font-size:22px;font-weight:700">İzleme listesi</div><div class="muted" id="izSay">${izFavori().length} favori</div></div><button class="iconbtn" data-tab="sanal">Sanal İşlem ›</button></div>
     <input id="izAra" class="iz-ara" placeholder="Ara (BTC, NVDA, altın, THYAO, fon kodu…)" value="${esc(izAra)}" autocomplete="off">
     <div class="iz-cipler">${IZ_GRUP.map(([k,l])=>`<button data-izgrup="${k}" class="${izGrup===k?"on":""}">${l}</button>`).join("")}</div>
     <div class="card iz-kart" id="izListe">${izListeHTML()}</div>
@@ -915,6 +917,163 @@ document.addEventListener("mousedown", e => { if (!izSiralanabilir() || e.button
 document.addEventListener("mousemove", e => { if (izSur) izSurHareket(e.clientY, e); });
 document.addEventListener("mouseup", izSurBitir);
 document.addEventListener("contextmenu", e => { if (e.target.closest("#izListe")) e.preventDefault(); });
+
+/* ============ Sanal işlem (paper trading) — gerçek para yok ============
+   Kurallar uygulama açıkken ve fiyatlar yenilendikçe kontrol edilir (dakikada bir). */
+const SN_BAS = {TRY:1000000, USD:20000};
+function snPB(k){
+  if (k.startsWith("b:") || ["gram24","ceyrek","gumus","USD","EUR","GBP"].includes(k)) return "TRY";
+  if (k.startsWith("a:") || k.startsWith("c:") || ["ONS","AGONS","BRENT","EURUSD","btc"].includes(k)) return "USD";
+  return null;
+}
+const sanalIslenebilir = k => !!snPB(k) && !k.startsWith("f:");
+function snHazir(){ if (!S.sanal) S.sanal = {bas:{...SN_BAS}, nakit:{...SN_BAS}, poz:{}, emir:[], gecmis:[]}; return S.sanal; }
+const snF = pb => pb==="USD" ? fUSD2 : fTL2n;
+const fAdet = new Intl.NumberFormat("tr-TR",{maximumFractionDigits:6});
+const snAd = k => izBul(k)?.l || k;
+function snFiyat(k){ const o = izBul(k); return (o && o.v>0) ? o.v : null; }
+function snIslem(k, yon, adet, fiyat, neden){
+  const sn = snHazir(), pb = snPB(k); adet = +adet;
+  if (!pb || !(adet>0) || !(fiyat>0)) return "Geçersiz işlem";
+  const tutar = adet*fiyat, poz = sn.poz[k] || {adet:0, ort:0, pb};
+  if (yon==="al"){
+    if (sn.nakit[pb] < tutar - 1e-9) return `Yetersiz sanal ${pb==="USD"?"dolar":"TL"} bakiye`;
+    sn.nakit[pb] -= tutar; poz.ort = (poz.ort*poz.adet + tutar)/(poz.adet+adet); poz.adet += adet; poz.pb = pb; sn.poz[k] = poz;
+  } else {
+    if (poz.adet < adet - 1e-9) return "Elinizde bu kadar yok";
+    sn.nakit[pb] += tutar; const kz = (fiyat-poz.ort)*adet; poz.adet -= adet;
+    if (poz.adet < 1e-9) delete sn.poz[k]; else sn.poz[k] = poz;
+    sn.gecmis.unshift({t:Date.now(), k, yon, adet, fiyat, pb, kz, neden}); kaydet(true); return null;
+  }
+  sn.gecmis.unshift({t:Date.now(), k, yon, adet, fiyat, pb, neden}); if (sn.gecmis.length>300) sn.gecmis.length=300;
+  kaydet(true); return null;
+}
+function sanalKontrol(){
+  const sn = S?.sanal; if (!sn || demo && !sn) return;
+  if ([...sn.emir.map(e=>e.k), ...Object.keys(sn.poz)].some(k=>k.startsWith("c:"))) kriptoAl();
+  let oldu = [];
+  for (const e of sn.emir.filter(e=>e.durum==="bekliyor")){
+    const p = snFiyat(e.k); if (!p) continue;
+    if ((e.kosul==="ustune" && p>=e.fiyat) || (e.kosul==="altina" && p<=e.fiyat)){
+      let adet = e.tutar ? e.tutar/p : e.adet; if (e.k.startsWith("b:")) adet = Math.floor(adet);
+      const hata = adet>0 ? snIslem(e.k, e.yon, adet, p, `Kural: ${e.kosul==="ustune"?"≥":"≤"} ${snF(snPB(e.k)).format(e.fiyat)}`) : "Tutar 1 adede yetmiyor";
+      if (!hata && e.yon==="al" && (e.sl||e.tp) && sn.poz[e.k]) { if (e.sl) sn.poz[e.k].sl = e.sl; if (e.tp) sn.poz[e.k].tp = e.tp; }
+      e.durum = hata ? "iptal" : "gerçekleşti"; e.sonuc = hata || `${snF(snPB(e.k)).format(p)} fiyattan`; e.zaman = Date.now();
+      oldu.push(`${e.yon==="al"?"AL":"SAT"} ${snAd(e.k)}${hata?" — "+hata:""}`);
+    }
+  }
+  for (const [k, z] of Object.entries(sn.poz)){
+    const p = snFiyat(k); if (!p) continue;
+    if (z.sl && p<=z.sl){ snIslem(k,"sat",z.adet,p,"Zarar kes"); oldu.push("Zarar kes: "+snAd(k)); }
+    else if (z.tp && p>=z.tp){ snIslem(k,"sat",z.adet,p,"Kâr al"); oldu.push("Kâr al: "+snAd(k)); }
+  }
+  if (oldu.length){ kaydet(true); toast("Sanal işlem: "+oldu.join(", ")); if (tab==="sanal") render(); }
+}
+let snSecili = null;
+function snDeger(){
+  const sn = snHazir(), t = {TRY:sn.nakit.TRY, USD:sn.nakit.USD};
+  for (const [k,z] of Object.entries(sn.poz)){ const p = snFiyat(k) ?? z.ort; t[z.pb] += z.adet*p; }
+  return t;
+}
+function sanal(){
+  const sn = snHazir(), d = snDeger(), kU = prices.fx.USD;
+  const kzT = d.TRY - sn.bas.TRY, kzU = d.USD - sn.bas.USD;
+  const sec = snSecili ? izBul(snSecili) : null, pb = snSecili ? snPB(snSecili) : null, sp = snSecili ? snFiyat(snSecili) : null;
+  const poz = Object.entries(sn.poz), bek = sn.emir.filter(e=>e.durum==="bekliyor");
+  const r = v => v>=0 ? "pos" : "neg", sg = v => v>=0 ? "+" : "−";
+  return `<div class="row" style="padding:0 0 6px"><button class="iconbtn" data-tab="izle" style="margin:0">‹ İzleme</button><span class="tag" style="border-color:var(--acc);color:var(--acc)">SANAL · gerçek para yok</span></div>
+  <div class="card">
+    <div class="muted">Sanal portföy</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px">
+      <div><div class="muted nb-k">TL hesap</div><b style="font-size:18px">${fTL2n.format(d.TRY)}</b><div class="${r(kzT)}" style="font-size:13px">${sg(kzT)}${fTL2n.format(Math.abs(kzT))} (${yuzde(kzT/sn.bas.TRY*100)})</div><div class="muted" style="font-size:12px">Nakit ${fTL2n.format(sn.nakit.TRY)}</div></div>
+      <div><div class="muted nb-k">USD hesap</div><b style="font-size:18px">${fUSD2.format(d.USD)}</b><div class="${r(kzU)}" style="font-size:13px">${sg(kzU)}${fUSD2.format(Math.abs(kzU))} (${yuzde(kzU/sn.bas.USD*100)})</div><div class="muted" style="font-size:12px">Nakit ${fUSD2.format(sn.nakit.USD)}</div></div>
+    </div>
+    ${kU?`<p class="muted" style="font-size:12px;margin:8px 0 0">Toplam ≈ ${fTL.format(d.TRY + d.USD*kU)} · başlangıç ${fTLn.format(sn.bas.TRY)} + ${fUSD.format(sn.bas.USD)}</p>`:""}
+  </div>
+
+  <h2>Yeni sanal işlem</h2>
+  <div class="card"><form id="snF" autocomplete="off">
+    <label>Enstrüman — adıyla ya da koduyla arayın</label>
+    <input id="snAra" placeholder="ör. tesla, btc, thyao, altın" value="">
+    <div id="snSonuc"></div>
+    ${sec?`<div class="row" style="border:0;padding:8px 0 0"><span><b>${esc(sec.l)}</b> <span class="muted">${esc(sec.alt||"")}</span></span><span><b>${sp?snF(pb).format(sp):"—"}</b></span></div>
+      ${sn.poz[snSecili]?`<div class="muted" style="font-size:12px">Elinizde: ${fN.format(sn.poz[snSecili].adet)} · ort. ${snF(pb).format(sn.poz[snSecili].ort)}</div>`:""}`:`<p class="muted">Önce bir enstrüman seçin.</p>`}
+    <div class="seg" style="display:flex;margin-top:12px">
+      <label class="segon" style="flex:1;margin:0;text-align:center;padding:8px;cursor:pointer" data-snyon="al"><input type="radio" name="yon" value="al" checked style="display:none">AL</label>
+      <label style="flex:1;margin:0;text-align:center;padding:8px;cursor:pointer" data-snyon="sat"><input type="radio" name="yon" value="sat" style="display:none">SAT</label>
+    </div>
+    <label>Ne zaman?</label>
+    <select name="kosul"><option value="simdi">Şimdi, güncel fiyattan</option><option value="ustune">Fiyat şu seviyenin ÜSTÜNE çıkarsa</option><option value="altina">Fiyat şu seviyenin ALTINA düşerse</option></select>
+    <div id="snSeviye" style="display:none"><label>Tetik fiyatı ${pb?"("+(pb==="USD"?"$":"TL")+")":""}</label><input name="fiyat" inputmode="decimal" placeholder="${sp?fN.format(sp):""}"></div>
+    <label>Miktar</label>
+    <div style="display:flex;gap:8px"><input name="miktar" inputmode="decimal" style="flex:2" placeholder="ör. 10"><select name="birim" style="flex:1"><option value="adet">adet</option><option value="tutar">${pb==="USD"?"$ tutar":"TL tutar"}</option></select></div>
+    <details style="margin-top:10px"><summary class="muted" style="cursor:pointer">Zarar kes / kâr al (isteğe bağlı, alışta)</summary>
+      <div style="display:flex;gap:8px"><div style="flex:1"><label>Zarar kes</label><input name="sl" inputmode="decimal" placeholder="${sp?fN.format(+(sp*0.95).toPrecision(6)):""}"></div><div style="flex:1"><label>Kâr al</label><input name="tp" inputmode="decimal" placeholder="${sp?fN.format(+(sp*1.1).toPrecision(6)):""}"></div></div>
+    </details>
+    <button class="btn" type="submit" ${sec?"":"disabled"}>Sanal emri ver</button>
+  </form></div>
+
+  <h2>Açık pozisyonlar</h2>
+  <div class="card">${poz.length ? poz.map(([k,z])=>{ const p = snFiyat(k), kz = p ? (p-z.ort)*z.adet : null;
+    return `<div class="row"><div><b>${esc(snAd(k))}</b><div class="muted" style="font-size:12px">${fAdet.format(z.adet)} · ort. ${snF(z.pb).format(z.ort)}${z.sl?" · ZK "+snF(z.pb).format(z.sl):""}${z.tp?" · KA "+snF(z.pb).format(z.tp):""}</div></div>
+      <div class="r"><div>${p?snF(z.pb).format(p*z.adet):"—"}</div>${kz!=null?`<div class="${r(kz)}" style="font-size:12px">${sg(kz)}${snF(z.pb).format(Math.abs(kz))} (${yuzde((p/z.ort-1)*100)})</div>`:""}
+      <button class="iconbtn" data-snkapat="${esc(k)}" style="margin-top:4px">Tümünü sat</button></div></div>`; }).join("") : '<p class="muted">Açık pozisyon yok.</p>'}</div>
+
+  <h2>Bekleyen kurallar</h2>
+  <div class="card">${bek.length ? bek.map(e=>`<div class="row"><div><b class="${e.yon==="al"?"pos":"neg"}">${e.yon==="al"?"AL":"SAT"}</b> ${esc(snAd(e.k))} · ${e.tutar?snF(snPB(e.k)).format(e.tutar)+" tutarında":fN.format(e.adet)}<div class="muted" style="font-size:12px">Fiyat ${e.kosul==="ustune"?"≥":"≤"} ${snF(snPB(e.k)).format(e.fiyat)} olursa · şu an ${snFiyat(e.k)?snF(snPB(e.k)).format(snFiyat(e.k)):"—"}</div></div><button class="iconbtn" data-sniptal="${esc(e.id)}">İptal</button></div>`).join("") : '<p class="muted">Bekleyen kural yok.</p>'}
+    <p class="muted" style="font-size:11px;margin:8px 0 0">Kurallar uygulama açıkken dakikada bir kontrol edilir; uygulama kapalıyken tetiklenmez. Hisse fiyatları ~15 dk gecikmelidir.</p></div>
+
+  <h2>İşlem geçmişi</h2>
+  <div class="card">${sn.gecmis.length ? sn.gecmis.slice(0,40).map(g=>`<div class="row"><div><b class="${g.yon==="al"?"pos":"neg"}">${g.yon==="al"?"AL":"SAT"}</b> ${esc(snAd(g.k))} · ${fAdet.format(g.adet)} × ${snF(g.pb).format(g.fiyat)}<div class="muted" style="font-size:12px">${new Date(g.t).toLocaleString("tr-TR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}${g.neden?" · "+esc(g.neden):""}</div></div>${g.kz!=null?`<span class="${r(g.kz)}">${sg(g.kz)}${snF(g.pb).format(Math.abs(g.kz))}</span>`:""}</div>`).join("") : '<p class="muted">Henüz işlem yok.</p>'}</div>
+  <button class="btn danger" data-act="snSifirla">Sanal hesabı sıfırla</button>
+  <p class="muted" style="font-size:11px">Sanal işlem yalnızca deneme ve öğrenme içindir; gerçek emir verilmez, aracı kurumunuzla bağlantısı yoktur. Yatırım tavsiyesi değildir.</p>`;
+}
+document.addEventListener("input", e => {
+  if (e.target.id !== "snAra") return;
+  const q = trKucuk(e.target.value).trim(), kutu = document.getElementById("snSonuc"); if (!kutu) return;
+  if (q.length < 2){ kutu.innerHTML = ""; return; }
+  kriptoAl();
+  const kel = q.split(/\s+/);
+  const L = izEvren().filter(o => sanalIslenebilir(o.k) && kel.every(w => trKucuk(o.l+" "+(o.alt||"")).includes(w))).slice(0,8);
+  kutu.innerHTML = L.length ? L.map(o=>`<div class="row tap" data-snsec="${esc(o.k)}"><div><b>${esc(o.l)}</b><div class="muted">${esc(o.alt||"")}</div></div><div class="r">${o.v==null?"—":(o.f||fTL2).format(o.v)}</div></div>`).join("") : '<p class="muted">Bulunamadı.</p>';
+});
+document.addEventListener("change", e => {
+  if (e.target.form?.id==="snF" && e.target.name==="kosul") document.getElementById("snSeviye").style.display = e.target.value==="simdi" ? "none" : "";
+});
+document.addEventListener("click", e => {
+  if (screen!=="app") return;
+  const sec = e.target.closest("[data-snsec]"); if (sec){ snSecili = sec.dataset.snsec; render(); return; }
+  const ac = e.target.closest("[data-snac]"); if (ac){ e.stopPropagation(); snSecili = ac.dataset.snac; grafikKapat(); tab="sanal"; render(); window.scrollTo(0,0); return; }
+  const y = e.target.closest("[data-snyon]"); if (y){ document.querySelectorAll("[data-snyon]").forEach(x=>x.classList.toggle("segon", x===y)); y.querySelector("input").checked = true; return; }
+  const kp = e.target.closest("[data-snkapat]"); if (kp){ const k = kp.dataset.snkapat, z = snHazir().poz[k], p = snFiyat(k);
+    if (!p) return toast("Güncel fiyat yok"); if (!confirm(`${snAd(k)} pozisyonunun tamamı sanal olarak satılsın mı?`)) return;
+    const h = snIslem(k, "sat", z.adet, p, "Elle kapatıldı"); toast(h || "Sanal satış yapıldı"); render(); return; }
+  const ip = e.target.closest("[data-sniptal]"); if (ip){ const em = snHazir().emir.find(x=>x.id===ip.dataset.sniptal); if (em){ em.durum="iptal"; kaydet(true); render(); } return; }
+}, true);
+document.addEventListener("submit", e => {
+  if (e.target.id!=="snF") return; e.preventDefault();
+  const f = e.target, sn = snHazir(), k = snSecili; if (!k) return;
+  const yon = f.querySelector("input[name=yon]:checked").value, kosul = f.kosul.value, p = snFiyat(k);
+  const mk = sayi(f.miktar.value), seviye = sayi(f.fiyat?.value);
+  if (!mk || mk<=0) return toast("Miktar girin");
+  const refFiyat = kosul==="simdi" ? p : seviye;
+  if (!refFiyat) return toast(kosul==="simdi" ? "Güncel fiyat yok, biraz bekleyin" : "Tetik fiyatını girin");
+  const tutarModu = f.birim.value==="tutar";
+  let adet = tutarModu ? mk/refFiyat : mk;
+  if (k.startsWith("b:")) { adet = Math.floor(adet); if (adet<1) return toast("BIST hisselerinde en az 1 adet"); }
+  const sl = sayi(f.sl.value), tp = sayi(f.tp.value);
+  if (yon==="al" && sl && sl >= refFiyat) return toast("Zarar kes seviyesi alış fiyatının altında olmalı");
+  if (yon==="al" && tp && tp <= refFiyat) return toast("Kâr al seviyesi alış fiyatının üstünde olmalı");
+  if (kosul==="simdi"){
+    const h = snIslem(k, yon, adet, p, "Anında"); if (h) return toast(h);
+    if (yon==="al" && (sl||tp)){ const z = sn.poz[k]; if (sl) z.sl = sl; if (tp) z.tp = tp; kaydet(true); }
+    toast(`Sanal ${yon==="al"?"alış":"satış"}: ${snAd(k)}`);
+  } else {
+    sn.emir.unshift({id:crypto.randomUUID(), k, yon, kosul, fiyat:seviye, adet, tutar: tutarModu ? mk : null, sl, tp, durum:"bekliyor", t:Date.now()});
+    kaydet(true); toast("Kural kaydedildi"); sanalKontrol();
+  }
+  render();
+});
 
 function kivilcim(seri, yon){
   if (!seri || seri.length < 3) return "";
@@ -1354,6 +1513,7 @@ document.addEventListener("click", async e => {
       await kaydet(true); const vardi = !!fidKayit(); fidSil(); render(); toast(vardi ? "Parola değiştirildi. Face ID'yi yeniden açın." : "Parola değiştirildi");
     }
     if (act==="filtreYok"){ filtre=null; render(); }
+    if (act==="snSifirla"){ if (confirm("Sanal hesap sıfırlansın mı? Tüm sanal pozisyonlar, kurallar ve geçmiş silinir.")){ S.sanal = null; snHazir(); await kaydet(true); render(); toast("Sanal hesap sıfırlandı"); } }
     if (act==="kilitle") kilitle();
     if (act==="gizle"){ gizli=!gizli; lsSet("gizle",gizli?"1":"0"); render(); }
     if (act==="yenile") fiyatlariAl();
