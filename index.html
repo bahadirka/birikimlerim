@@ -136,8 +136,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 36; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 37; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:37, t:"2026-11-07", n:["İçe aktarma bağlantısı alış maliyetlerini de ekleyebilir (kâr/zarar için)"]},
   {s:36, t:"2026-11-07", n:["İçe aktarma bağlantısı yanlış girilmiş kurum adını da düzeltebilir"]},
   {s:35, t:"2026-11-07", n:["İçe aktarma bağlantısı: Claude'un hazırladığı bağlantıyla hisse listesi tek onayla kasaya eklenir","Yeni BIST hisseleri: AGROT, AHGAZ, CVKMD, GIPTA, KZGYO, SDTTR, DMRGD, HATSN"]},
   {s:34, t:"2026-11-07", n:["Sanal İşlem (paper trading): 1.000.000 TL + 20.000 $ sanal bakiyeyle gerçek para olmadan al/sat","Kural koyma: fiyat bir seviyenin üstüne çıkarsa / altına düşerse otomatik sanal al veya sat","Zarar kes / kâr al, açık pozisyonlar, kâr/zarar ve işlem geçmişi","İzleme listesinden ya da grafik penceresindeki \"Sanal işlem yap\" düğmesinden açılır"]},
@@ -1088,7 +1089,7 @@ function iceAktarKontrol(){
   const w = document.createElement("div"); w.className = "gp"; w.id = "icePencere";
   w.innerHTML = `<div class="gp-kart"><div style="font-size:18px;font-weight:700">Portföye eklensin mi?</div>
     <p class="muted" style="margin:4px 0 8px">${esc(iceBekleyen.n||"")} — ${L.length} kalem. Aynı hisse aynı kurumda zaten varsa adedi güncellenir.</p>
-    ${L.map(x=>`<div class="row"><span><b>${esc(x.s)}</b> <span class="muted">${esc(ad(x))}</span><div class="muted" style="font-size:12px">${esc(x.y)}</div></span><b>${fN.format(x.q)} adet</b></div>`).join("")}
+    ${L.map(x=>`<div class="row"><span><b>${esc(x.s)}</b> <span class="muted">${esc(ad(x))}</span><div class="muted" style="font-size:12px">${esc(x.y)}</div></span><b>${x.q!=null?fN.format(x.q)+" adet":""}${x.c!=null?`<div class="muted" style="font-size:12px;font-weight:400">maliyet ${x.ct==="toplam"?fTL2n.format(x.c)+" toplam":fTL2n.format(x.c)+" / adet"}</div>`:""}</b></div>`).join("")}
     <button class="btn" id="iceEvet">Ekle</button><button class="btn ghost" id="iceHayir">Vazgeç</button></div>`;
   document.body.appendChild(w);
   const kapat = () => { w.remove(); iceBekleyen = null; try { history.replaceState(null, "", location.pathname + location.search); } catch {} };
@@ -1097,8 +1098,9 @@ function iceAktarKontrol(){
     let yeni = 0, guncel = 0;
     for (const x of L){
       const ayni = S.assets.find(a => a.type==="bist" && String(a.symbol).toUpperCase()===x.s && ((a.konumNot||"")===x.y || (x.o && (a.konumNot||"")===x.o)));
-      if (ayni){ ayni.qty = x.q; ayni.konumNot = x.y; guncel++; }
-      else { S.assets.push({id:crypto.randomUUID(), type:"bist", symbol:x.s, qty:x.q, konum:"araci", konumNot:x.y, date:bugun()}); yeni++; }
+      const mal = x.c!=null ? {cost:x.c, costTip:x.ct||"birim", costCur:"TRY"} : {};
+      if (ayni){ if (x.q!=null) ayni.qty = x.q; ayni.konumNot = x.y; Object.assign(ayni, mal); guncel++; }
+      else { S.assets.push({id:crypto.randomUUID(), type:"bist", symbol:x.s, qty:x.q, konum:"araci", konumNot:x.y, date:bugun(), ...mal}); yeni++; }
     }
     kapat(); await kaydet(); tab = "varlik"; filtre = "bist"; render();
     toast(`${yeni} hisse eklendi${guncel?`, ${guncel} güncellendi`:""}`);
