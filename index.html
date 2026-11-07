@@ -59,6 +59,9 @@ main a{color:var(--acc)}
 .iz-kart{padding:0 12px}
 .iz-satir{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
 .iz-satir:last-child{border-bottom:0}
+.iz-satir{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;position:relative;background:var(--card)}
+.iz-satir.surukle{z-index:5;box-shadow:0 8px 24px rgba(0,0,0,.35);border-radius:12px;border-bottom-color:transparent;transition:box-shadow .15s;cursor:grabbing}
+
 .iz-yildiz{background:none;border:0;font-size:20px;color:var(--muted);padding:0 2px;cursor:pointer;line-height:1}
 .iz-yildiz.on{color:var(--acc)}
 .iz-satir .iz-ik{width:34px;height:34px;font-size:10px}
@@ -121,8 +124,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 30; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 31; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:31, t:"2026-11-07", n:["Favori listesinde sıralama: satıra basılı tutup yukarı/aşağı sürükleyin","Fenerbahçe (FENER), Galatasaray (GSRAY), Beşiktaş (BJKAS) ve Trabzonspor (TSPOR) hisseleri eklendi"]},
   {s:30, t:"2026-11-07", n:["İzleme listesi sekmesi: kripto, hisseler (BIST/ABD), endeksler, döviz, emtia (ons altın/gümüş, Brent) ve fonlar","☆ ile favori listenizi oluşturun (şifreli kasada saklanır, eşinizle ortak)","Arama ve kategori düğmeleri; satıra dokununca grafik (Gün/Hafta/Ay/Yıl)","Özel Kasa artık Varlıklar sayfasının sağ üstünde"]},
   {s:29, t:"2026-11-07", n:["Özet'te seçilen para birimi (TL / USD / EUR) tüm uygulamada geçerli: varlık listeleri, kategori toplamları, dilim grafik, kasa, borç/alacak ve vadeli mevduat detayları"]},
   {s:28, t:"2026-11-07", n:["Sürüm 27'deki günlük kâr/zarar gösterimi geri alındı; uygulama Sürüm 26 haline döndü"]},
@@ -761,6 +765,7 @@ function izleme(){
     <input id="izAra" class="iz-ara" placeholder="Ara (BTC, NVDA, altın, THYAO, fon kodu…)" value="${esc(izAra)}" autocomplete="off">
     <div class="iz-cipler">${IZ_GRUP.map(([k,l])=>`<button data-izgrup="${k}" class="${izGrup===k?"on":""}">${l}</button>`).join("")}</div>
     <div class="card iz-kart" id="izListe">${izListeHTML()}</div>
+    ${izGrup==="fav"?'<p class="muted" style="font-size:12px;margin:4px 0">Sırayı değiştirmek için satıra basılı tutun, sonra yukarı/aşağı sürükleyin.</p>':""}
     <p class="muted" style="font-size:11px">Kripto anlık (CoinGecko); hisse, endeks ve emtia ~15 dk gecikmeli, yarım saatte bir; fonlar günlük. Satıra dokununca grafik açılır.</p>`;
 }
 document.addEventListener("input", e => { if (e.target.id==="izAra"){ izAra = e.target.value; izListeYenile(); } });
@@ -774,8 +779,46 @@ document.addEventListener("click", e => {
   const g = e.target.closest("[data-izgrup]");
   if (g){ izGrup = g.dataset.izgrup; render(); return; }
   const r = e.target.closest("[data-iz]");
+  if (r && Date.now()-izTikEngel < 500) { e.stopPropagation(); return; }
   if (r){ if (r.dataset.iz.startsWith("f:")) return toast("Fonlar için grafik henüz yok"); grafikAc(r.dataset.iz); }
 }, true);
+
+/* Favorilerde basılı tutup sürükleyerek sıralama */
+let izSur = null, izTikEngel = 0;
+const izSiralanabilir = () => tab==="izle" && izGrup==="fav" && !izAra.trim();
+function izSurBasla(row, y){
+  izSur = {row, y0:y, kayma:0, aktif:false, zaman: setTimeout(()=>{
+    if (!izSur) return; izSur.aktif = true; row.classList.add("surukle"); try { navigator.vibrate?.(12); } catch {}
+  }, 380)};
+}
+function izSurHareket(y, e){
+  if (!izSur) return;
+  if (!izSur.aktif){ if (Math.abs(y-izSur.y0) > 8){ clearTimeout(izSur.zaman); izSur = null; } return; }
+  e?.preventDefault?.();
+  const row = izSur.row;
+  let dy = y - izSur.y0 - izSur.kayma;
+  const sonraki = row.nextElementSibling, onceki = row.previousElementSibling;
+  if (dy > 0 && sonraki && dy > sonraki.offsetHeight/2){ row.parentNode.insertBefore(sonraki, row); izSur.kayma += sonraki.offsetHeight; dy -= sonraki.offsetHeight; }
+  else if (dy < 0 && onceki && -dy > onceki.offsetHeight/2){ row.parentNode.insertBefore(row, onceki); izSur.kayma -= onceki.offsetHeight; dy += onceki.offsetHeight; }
+  row.style.transform = `translateY(${dy}px)`;
+}
+function izSurBitir(){
+  if (!izSur) return;
+  clearTimeout(izSur.zaman);
+  if (izSur.aktif){
+    const row = izSur.row; row.classList.remove("surukle"); row.style.transform = "";
+    const sira = [...document.querySelectorAll("#izListe [data-iz]")].map(x=>x.dataset.iz);
+    S.izleme = sira; kaydet(true); izTikEngel = Date.now();
+  }
+  izSur = null;
+}
+document.addEventListener("touchstart", e => { if (!izSiralanabilir() || e.target.closest("[data-yildiz]")) return; const r = e.target.closest("#izListe [data-iz]"); if (r) izSurBasla(r, e.touches[0].clientY); }, {passive:true});
+document.addEventListener("touchmove", e => { if (izSur) izSurHareket(e.touches[0].clientY, e); }, {passive:false});
+document.addEventListener("touchend", izSurBitir); document.addEventListener("touchcancel", izSurBitir);
+document.addEventListener("mousedown", e => { if (!izSiralanabilir() || e.button!==0 || e.target.closest("[data-yildiz]")) return; const r = e.target.closest("#izListe [data-iz]"); if (r) izSurBasla(r, e.clientY); });
+document.addEventListener("mousemove", e => { if (izSur) izSurHareket(e.clientY, e); });
+document.addEventListener("mouseup", izSurBitir);
+document.addEventListener("contextmenu", e => { if (e.target.closest("#izListe")) e.preventDefault(); });
 
 function kivilcim(seri, yon){
   if (!seri || seri.length < 3) return "";
