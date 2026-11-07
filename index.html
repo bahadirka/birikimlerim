@@ -190,8 +190,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 51; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 52; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:52, t:"2026-11-07", n:["PDF rapor: kurum ve miktar varlık adının altına alındı, sütunlar artık karışmıyor","Her grubun altında etiketli özet: Toplam değer · Toplam maliyet · Kâr / zarar (renkli, tutar ve yüzde)","Her satırda kâr/zarar yüzdesi ve tutarı ayrı ayrı","Gruplar değeri en yüksekten en düşüğe sıralanır"]},
   {s:51, t:"2026-11-07", n:["Haberler: sahip olduğunuz ve izlediğiniz hisselerin son haberleri (Özet → Haberler, ayrıca her hissenin detayında)","Enflasyona karşı: portföyünüz TÜFE, dolar, altın ve BIST 100 ile karşılaştırılır; reel getiri ve \"dolar alsaydım\" farkı","Durum kartları: trend, RSI, 52 haftalık aralık, analist hedefi ve yoğunlaşma uyarıları — bilgi amaçlı, tavsiye değil","Fon karşılaştırmasına TÜFE eklendi"]},
   {s:50, t:"2026-11-07", n:["Rapor: istediğiniz yatırım gruplarını seçip renkli, grafikli PDF özet oluşturun; WhatsApp veya e-postayla paylaşın","Seçenekler: kalem kalem liste, tutarları gizleme (yalnız yüzdeler), TL / USD / EUR","Özet sayfasının altında ve Ayarlar'da \"Rapor oluştur\" düğmesi"]},
   {s:49, t:"2026-11-07", n:["ABD hisse ve ETF'lerinde ortalama ve toplam maliyet her yerde dolar ($) olarak gösterilir"]},
@@ -1337,43 +1338,70 @@ function rpCiz(){
       ly += 62; }
     y += DH + 36;
   }
-  // Gruplar
-  const SX = [RPM+30, RPM+560, RPM+880, RPM+1150, RPW-RPM-30];   // varlık, kurum, miktar(sağ), değer(sağ), K/Z(sağ)
-  const baslik = (k, tt, devam) => { sigar(240); const ren = TYPES[k].renk;
+  // Gruplar — değeri büyükten küçüğe; borç/alacak en sonda
+  const grDeger = k => S.assets.filter(a=>a.type===k).reduce((x,a)=>x+(degerTL(a)||0),0);
+  const grSira = gr.slice().sort((x,y2) => (isBA({type:x})-isBA({type:y2})) || (grDeger(y2)-grDeger(x)));
+  const SAG = RPW-RPM-30, DEGX = RPW-RPM-330, SOLW = DEGX-RPM-30-260;   // K/Z sütunu sağ kenar, değer sütunu sağ kenar, sol metin genişliği
+  const khTL = kh => kh ? (kh.tl ? kh.tutar : kh.tutar*(kurTL(kh.pb)||0)) : null;
+  const isaret = v => v>=0 ? "+" : "−";
+  const birimAd = a => a.type==="fon"||a.type==="bes" ? "pay" : a.type==="altin" ? (a.unit==="gram"||!a.unit ? "gr" : "adet") : a.type==="nakit"||isBA(a) ? (a.cur||"TRY") : a.type==="kripto" ? String(a.symbol||"").toUpperCase() : "adet";
+  const baslik = (k, ozet, devam) => { sigar(devam ? 200 : 330); const ren = TYPES[k].renk;
     g.save(); g.beginPath(); g.roundRect(RPM, y, RPW-2*RPM, 84, [26,26,0,0]); g.fillStyle = ren; g.fill(); g.restore();
-    yazi(TYPES[k].ad + (devam?" (devam)":""), RPM+30, y+54, 32, 800, "#fff", "left", 600);
-    if (!devam){ const sag = (RP.gizliTutar?"":rpPara(tt.v, pb)) + (tt.kz!=null ? `${RP.gizliTutar?"":"  ·  "}${RP.gizliTutar?"":(tt.kz>=0?"+":"−")+rpPara(Math.abs(tt.kz), pb)+"  "}${yuzde(tt.kzOran)}` : ""); yazi(sag, RPW-RPM-30, y+54, 28, 700, "#fff", "right", 760); }
+    yazi(TYPES[k].ad + (devam?" (devam)":""), RPM+30, y+55, 34, 800, "#fff", "left", 800);
+    if (!devam && ozet.pay!=null) yazi(`Portföyün %${fN2.format(ozet.pay)}'i`, SAG, y+53, 26, 600, "rgba(255,255,255,.92)", "right");
     y += 84;
-    if (RP.detay){ g.fillStyle = "#fff"; g.fillRect(RPM, y, RPW-2*RPM, 56);
-      yazi("Varlık", SX[0], y+38, 22, 600, GRI); yazi("Kurum", SX[1], y+38, 22, 600, GRI); yazi("Miktar", SX[2], y+38, 22, 600, GRI, "right");
-      yazi("Değer", SX[3], y+38, 22, 600, GRI, "right"); yazi("Kâr / zarar", SX[4], y+38, 22, 600, GRI, "right"); y += 56; } };
+    if (!devam){   // grup özeti: etiketli hücreler, kâr/zarar renkli
+      const H2 = 104; g.fillStyle = "#fff"; g.fillRect(RPM, y, RPW-2*RPM, H2);
+      g.fillStyle = TYPES[k].renk; g.globalAlpha = .07; g.fillRect(RPM, y, RPW-2*RPM, H2); g.globalAlpha = 1;
+      const hucre = (x, bas, deger, renk, alt) => { yazi(bas, x, y+38, 21, 600, GRI); yazi(deger, x, y+78, 30, 800, renk, "left", 420); if (alt) { font(30,800); const w = g.measureText(deger).width; yazi(alt, x+w+12, y+78, 24, 700, renk); } };
+      const cw = (RPW-2*RPM-60)/3;
+      hucre(RPM+30, "Toplam değer", RP.gizliTutar ? "•••" : rpPara(ozet.v, pb), "#1d1d1f");
+      if (ozet.ba) hucre(RPM+30+cw, "Kayıt sayısı", String(ozet.n), "#1d1d1f");
+      else {
+        hucre(RPM+30+cw, "Toplam maliyet", ozet.mal==null ? "girilmemiş" : RP.gizliTutar ? "•••" : rpPara(ozet.mal, pb), ozet.mal==null ? "#adb5bd" : "#1d1d1f");
+        if (ozet.kz==null) hucre(RPM+30+2*cw, "Kâr / zarar", "—", "#adb5bd");
+        else hucre(RPM+30+2*cw, "Kâr / zarar", RP.gizliTutar ? yuzde(ozet.kzOran,1) : isaret(ozet.kz)+rpPara(Math.abs(ozet.kz), pb), kzR(ozet.kz), RP.gizliTutar ? "" : `(${yuzde(ozet.kzOran,1)})`);
+      }
+      y += H2;
+    }
+    if (RP.detay){ g.fillStyle = "#fff"; g.fillRect(RPM, y, RPW-2*RPM, 50); g.fillStyle = CIZ; g.fillRect(RPM+20, y+49, RPW-2*RPM-40, 2);
+      yazi("Varlık  ·  kurum  ·  miktar", RPM+30, y+34, 21, 600, GRI); yazi("Değer", DEGX, y+34, 21, 600, GRI, "right"); yazi("Kâr / zarar", SAG, y+34, 21, 600, GRI, "right"); y += 50; } };
   const kapat = () => { g.save(); g.beginPath(); g.roundRect(RPM, y, RPW-2*RPM, 22, [0,0,26,26]); g.fillStyle = "#fff"; g.fill(); g.restore(); y += 22 + 30; };
-  for (const k of gr){
+  const varlikTop = tum.reduce((x,a)=>x+(degerTL(a)||0),0) || 1;
+  for (const k of grSira){
     const l = S.assets.filter(a=>a.type===k); if (!l.length) continue;
-    const ba = isBA({type:k}), tt = ba ? {v:l.reduce((x,a)=>x+(degerTL(a)||0),0), kz:null} : toplam(l);
-    baslik(k, tt, false);
+    const ba = isBA({type:k}), tt = ba ? {v:grDeger(k), kz:null} : toplam(l);
+    const malL = l.map(maliyetTL).filter(x=>x!=null), ozet = {v:tt.v, kz:tt.kz, kzOran:tt.kzOran, ba, n:l.length,
+      mal: malL.length ? malL.reduce((x,y2)=>x+y2,0) : null, pay: ba ? null : tt.v/varlikTop*100};
+    baslik(k, ozet, false);
     if (RP.detay){
       const sirali = l.slice().sort((x,y2)=>(degerTL(y2)||0)-(degerTL(x)||0));
       sirali.forEach((a, i) => {
-        if (y + 62 > RPH - 90){ kapat(); yeni(); baslik(k, tt, true); }
-        const kh = kzHesap(a), d = degerTL(a), RH = 62;
+        const RH = 88;
+        if (y + RH > RPH - 90){ kapat(); yeni(); baslik(k, ozet, true); }
+        const kh = ba ? null : kzHesap(a), d = degerTL(a);
         g.fillStyle = i%2 ? "#fbfaf7" : "#fff"; g.fillRect(RPM, y, RPW-2*RPM, RH);
         g.fillStyle = TYPES[k].renk; g.fillRect(RPM, y, 6, RH);
-        yazi(etiket(a), SX[0], y+41, 26, 700, "#1d1d1f", "left", 500);
-        yazi(a.konumNot||a.banka||KONUM[a.konum]||"", SX[1], y+41, 24, 400, GRI, "left", 230);
-        yazi(a.type==="mevduat"||ba ? "" : fN.format(+a.qty||0), SX[2], y+41, 24, 400, "#1d1d1f", "right", 250);
-        yazi(rpPara(d, pb), SX[3], y+41, 26, 700, "#1d1d1f", "right", 250);
+        // sol: ad (1. satır), kurum · miktar (2. satır)
+        yazi(etiket(a), RPM+30, y+38, 26, 700, "#1d1d1f", "left", SOLW);
+        const alt = [a.konumNot||a.banka||KONUM[a.konum]||"", a.type==="mevduat" ? (a.vade ? "vade "+new Date(a.vade).toLocaleDateString("tr-TR") : "") : `${fN.format(+a.qty||0)} ${birimAd(a)}`].filter(Boolean).join("  ·  ");
+        yazi(alt, RPM+30, y+70, 22, 400, GRI, "left", SOLW);
+        // orta: değer + grup içi payı
+        yazi(rpPara(d, pb), DEGX, y+38, 26, 700, "#1d1d1f", "right", 280);
+        if (d && tt.v) yazi(`%${fN2.format(d/tt.v*100)}`, DEGX, y+70, 21, 400, GRI, "right");
+        // sağ: yüzde rozeti + tutar
         if (kh){ const txt = yuzde(kh.oran,1); font(24,700); const w = g.measureText(txt).width + 28;
-          kutu(SX[4]-w, y+14, w, 36, 18, kh.oran>=0 ? "#e6f4ea" : "#fde8e8"); yazi(txt, SX[4]-14, y+41, 24, 700, kzR(kh.oran), "right"); }
-        else yazi("—", SX[4]-14, y+41, 24, 400, "#adb5bd", "right");
+          kutu(SAG-w, y+12, w, 38, 19, kh.oran>=0 ? "#e6f4ea" : "#fde8e8"); yazi(txt, SAG-14, y+40, 24, 700, kzR(kh.oran), "right");
+          const tl = khTL(kh); if (!RP.gizliTutar && tl!=null) yazi(isaret(tl)+rpPara(Math.abs(tl), pb), SAG-14, y+74, 21, 600, kzR(tl), "right", 260); }
+        else yazi(ba ? "" : "maliyet yok", SAG-14, y+40, 21, 400, "#adb5bd", "right");
         y += RH;
       });
     }
     kapat();
   }
-  sigar(80);
-  yazi("Fiyatlar: hisse/endeks ~15 dk gecikmeli, fonlar TEFAS günlük, altın/döviz serbest piyasa, kripto anlık.", RPM, y+10, 20, 400, "#868e96");
-  yazi("Bu rapor bilgilendirme amaçlıdır, yatırım tavsiyesi değildir.", RPM, y+40, 20, 400, "#868e96");
+  // açıklama son sayfanın alt bilgisinde (ayrı sayfaya taşmasın)
+  yazi("Fiyatlar: hisse/endeks ~15 dk gecikmeli, fonlar TEFAS günlük, altın/döviz serbest piyasa, kripto anlık.", RPM, RPH-68, 19, 400, "#868e96", "left", RPW-2*RPM-260);
+  yazi("Bu rapor bilgilendirme amaçlıdır, yatırım tavsiyesi değildir.", RPM, RPH-40, 19, 400, "#868e96");
   sayfalar.forEach((s, i) => { const gg = s.getContext("2d"); gg.font = `400 20px ${FONT}`; gg.fillStyle = "#868e96"; gg.textAlign = "right";
     gg.fillText(`Birikimlerim · ${i+1} / ${sayfalar.length}`, RPW-RPM, RPH-40); });
   return sayfalar;
