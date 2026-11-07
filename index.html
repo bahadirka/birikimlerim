@@ -162,8 +162,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 46; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 47; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:47, t:"2026-11-07", n:["İçe aktarma: dolar cinsinden maliyetler doğru para birimiyle gösterilir"]},
   {s:46, t:"2026-11-07", n:["İçe aktarma bağlantısı ABD hisse/ETF'lerini de ekleyebilir","Yeni ABD kodları: PALL, PPLT, REMX, SPPP, COPX, SETM, OKLO, EMXC, EWZ, EWY"]},
   {s:45, t:"2026-11-07", n:["BIST hisselerinin altında hisse özeti: kaç farklı hisse, kaçı BIST 30 / BIST 100'de, kaçı endeks dışı ve değer payları (Ekim–Aralık 2026 listeleri)","Fon karşılaştırmasında TL / USD bazında seçimi; portföyünüzdeki aynı para birimli diğer fonlar da aynı grafikte (ör. dolar fonlarınız birbiriyle)"]},
   {s:44, t:"2026-11-07", n:["Birleşik satıra dokununca kurumlar kısa özetle (adet, ortalama maliyet, kâr/zarar) açılır","Kuruma ya da herhangi bir varlığa dokununca okuma amaçlı detay sayfası: fiyat, maliyet, kâr/zarar TL ve USD, günlük değişim, grafik; Düzenle ve Sil en altta"]},
@@ -1124,7 +1125,7 @@ function iceAktarKontrol(){
   const w = document.createElement("div"); w.className = "gp"; w.id = "icePencere";
   w.innerHTML = `<div class="gp-kart"><div style="font-size:18px;font-weight:700">Portföye eklensin mi?</div>
     <p class="muted" style="margin:4px 0 8px">${esc(iceBekleyen.n||"")} — ${L.length} kalem. Aynı hisse aynı kurumda zaten varsa adedi güncellenir.</p>
-    ${L.map(x=>`<div class="row"><span><b>${esc(x.s)}</b> <span class="muted">${esc(ad(x))}</span><div class="muted" style="font-size:12px">${esc(x.y)}</div></span><b>${x.q!=null?fN.format(x.q)+" adet":""}${x.c!=null?`<div class="muted" style="font-size:12px;font-weight:400">maliyet ${x.ct==="toplam"?fTL2n.format(x.c)+" toplam":fTL2n.format(x.c)+" / adet"}</div>`:""}</b></div>`).join("")}
+    ${L.map(x=>`<div class="row"><span><b>${esc(x.s)}</b> <span class="muted">${esc(ad(x))}</span><div class="muted" style="font-size:12px">${esc(x.y)}</div></span><b>${x.q!=null?fN.format(x.q)+" adet":""}${x.c!=null?`<div class="muted" style="font-size:12px;font-weight:400">maliyet ${(x.cc==="USD"?fUSD2:fTL2n).format(x.c)}${x.ct==="toplam"?" toplam":" / adet"}</div>`:""}</b></div>`).join("")}
     <button class="btn" id="iceEvet">Ekle</button><button class="btn ghost" id="iceHayir">Vazgeç</button></div>`;
   document.body.appendChild(w);
   const kapat = () => { w.remove(); iceBekleyen = null; try { history.replaceState(null, "", location.pathname + location.search); } catch {} };
