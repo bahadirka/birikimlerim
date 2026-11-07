@@ -249,7 +249,7 @@ def fon_getiri(hedef):
         r = requests.get(f"https://raw.githubusercontent.com/{os.environ.get('GITHUB_REPOSITORY','bahadirka/birikimlerim')}/fiyatlar/fon_getiri.json", timeout=20)
         if r.ok:
             eski = r.json()
-            if eski.get("tarih") == bugun.isoformat() and eski.get("ref") and eski.get("fon"):
+            if eski.get("tarih") == bugun.isoformat() and eski.get("ref") and eski.get("fon") and "BTC" in (eski.get("kiyas", {}).get("1A") or {}):
                 Path(hedef).write_text(r.text, encoding="utf-8"); return
     except Exception:
         pass
@@ -299,11 +299,13 @@ def fon_getiri(hedef):
     kiyas = {}
     try:
         import yfinance as yf
-        df = yf.download(["XU100.IS", "USDTRY=X", "EURTRY=X", "GC=F"], period="6y", interval="1d", group_by="ticker", progress=False, auto_adjust=False)
-        seri = {t: df[t]["Close"].dropna() for t in ["XU100.IS", "USDTRY=X", "EURTRY=X", "GC=F"]}
+        tk = ["XU100.IS", "USDTRY=X", "EURTRY=X", "GC=F", "SI=F", "BTC-USD", "^GSPC"]
+        df = yf.download(tk, period="6y", interval="1d", group_by="ticker", progress=False, auto_adjust=False)
+        seri = {t: df[t]["Close"].dropna() for t in tk}
         import pandas as pd
-        alt = (seri["GC=F"] * seri["USDTRY=X"].reindex(seri["GC=F"].index, method="ffill")).dropna()
-        seri2 = {"XU100": seri["XU100.IS"], "ALTIN": alt, "USD": seri["USDTRY=X"], "EUR": seri["EURTRY=X"]}
+        tl = lambda c: (c * seri["USDTRY=X"].reindex(c.index, method="ffill")).dropna()   # dolar fiyatı → TL
+        seri2 = {"XU100": seri["XU100.IS"], "ALTIN": tl(seri["GC=F"]), "USD": seri["USDTRY=X"], "EUR": seri["EURTRY=X"],
+                 "GUMUS": tl(seri["SI=F"]), "BTC": tl(seri["BTC-USD"]), "SP500": tl(seri["^GSPC"])}
         for ad, d in donem.items():
             kiyas[ad] = {}
             for k, c in seri2.items():

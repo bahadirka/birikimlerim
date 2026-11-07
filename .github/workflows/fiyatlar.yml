@@ -3,6 +3,7 @@ on:
   schedule:
     - cron: "7,37 6-16 * * 1-5"   # hafta içi 09:07–19:37 (TR) yarım saatte bir
     - cron: "17 19 * * 1-5"       # akşam: TEFAS günlük fiyatları
+    - cron: "23 6,12,18 * * 0,6"  # hafta sonu: haberler
   workflow_dispatch:
   push:
     branches: [main]
@@ -15,7 +16,7 @@ concurrency:
 jobs:
   topla:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -23,6 +24,10 @@ jobs:
           python-version: "3.12"
       - run: pip install -q yfinance requests
       - run: python scripts/fiyatlar.py /tmp/prices.json /tmp/grafik
+      - name: önceki yayını al (haber/analiz önbelleği)
+        run: git clone -q --depth 1 -b fiyatlar "https://github.com/${{ github.repository }}.git" /tmp/onceki || mkdir -p /tmp/onceki
+      - name: durum, enflasyon, haberler
+        run: python scripts/analiz.py /tmp/ek /tmp/onceki || true
       - name: fiyatlar dalına yaz
         run: |
           cd /tmp && rm -rf yayin && mkdir yayin && cd yayin
@@ -30,6 +35,8 @@ jobs:
           cp /tmp/prices.json .
           cp -r /tmp/grafik . || true
           cp /tmp/fon_getiri.json . || true
+          cp /tmp/ek/analiz.json . || true
+          cp -r /tmp/ek/haber . || true
           git config user.name "fiyat-botu"
           git config user.email "fiyat-botu@users.noreply.github.com"
           git add -A
