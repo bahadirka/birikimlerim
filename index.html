@@ -165,8 +165,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 48; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 49; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:49, t:"2026-11-07", n:["ABD hisse ve ETF'lerinde ortalama ve toplam maliyet her yerde dolar ($) olarak gösterilir"]},
   {s:48, t:"2026-11-07", n:["Dilim grafikte renge dokununca başka sayfaya gitmeden bilgisi açılır: kategori, toplam değer, portföy payı, kâr/zarar, dolar ve euro karşılığı","Alttaki satırlar eskisi gibi detay sayfasına götürür"]},
   {s:47, t:"2026-11-07", n:["İçe aktarma: dolar cinsinden maliyetler doğru para birimiyle gösterilir"]},
   {s:46, t:"2026-11-07", n:["İçe aktarma bağlantısı ABD hisse/ETF'lerini de ekleyebilir","Yeni ABD kodları: PALL, PPLT, REMX, SPPP, COPX, SETM, OKLO, EMXC, EWZ, EWY"]},
@@ -1527,7 +1528,9 @@ function gHesap(o){
   let deger=0, eksik=false, mal=0, malDeger=0, adet=0, malAdet=0;
   for (const a of o.grup){ const d = degerTL(a), m = maliyetTL(a), q = +a.qty||0; adet += q;
     if (d==null) { eksik = true; continue; } deger += d; if (m!=null){ mal += m; malDeger += d; malAdet += q; } }
-  return {ad:etiket(o.grup[0]), deger: eksik && !deger ? null : deger, oran: mal ? (malDeger/mal-1)*100 : null, kz: mal ? malDeger-mal : null, adet, malAdet, ort: malAdet ? mal/malAdet : null};
+  const abd = o.grup[0].type==="abd", malU = abd ? o.grup.reduce((x,a)=>x+(maliyetUSD(a)??0),0) : 0;
+  const degU = abd ? o.grup.reduce((x,a)=>x+(maliyetUSD(a)!=null ? (usdDeger(a)||0) : 0),0) : 0;
+  return {ad:etiket(o.grup[0]), deger: eksik && !deger ? null : deger, oran: mal ? (malDeger/mal-1)*100 : null, kz: mal ? malDeger-mal : null, adet, malAdet, ort: malAdet ? mal/malAdet : null, ortUSD: abd && malAdet ? malU/malAdet : null, kzU: abd && malU ? degU-malU : null, oranU: abd && malU ? (degU/malU-1)*100 : null};
 }
 function gSatir(o){
   if (o.tek) return satir(o.tek);
@@ -1536,21 +1539,25 @@ function gSatir(o){
   const birim = a0.type==="fon"||a0.type==="bes" ? "pay" : a0.type==="altin" ? "adet/gr" : "adet";
   return `<div class="row tap grup" data-grup="${esc(o.anahtar)}">
     <div><div>${esc(h.ad)} <span class="tag">${o.grup.length} kurum</span> <span class="muted">${acik?"▾":"▸"}</span></div>
-      <div class="muted">${gizli?"••••":fN.format(h.adet)} ${birim}${h.ort!=null?` · ort. maliyet ${para(h.ort, fTL2n)}${h.malAdet < h.adet - 1e-9 ? ` (yalnız ${fN.format(h.malAdet)} ${birim} için)` : ""}`:""}${cf?` · <span class="pos">canlı</span> ${a0.type==="abd"?"$"+fN.format(cf.p):fN.format(cf.p)+" TL"}`:""}</div>
+      <div class="muted">${gizli?"••••":fN.format(h.adet)} ${birim}${h.ort!=null?` · ort. maliyet ${h.ortUSD!=null?para(h.ortUSD, fUSD2):para(h.ort, fTL2n)}${h.malAdet < h.adet - 1e-9 ? ` (yalnız ${fN.format(h.malAdet)} ${birim} için)` : ""}`:""}${cf?` · <span class="pos">canlı</span> ${a0.type==="abd"?"$"+fN.format(cf.p):fN.format(cf.p)+" TL"}`:""}</div>
       <div class="muted" style="font-size:12px">${esc(kurumlar.join(" + "))}</div></div>
-    <div class="r"><div><b>${para(h.deger)}</b></div>${h.kz!=null?`<div class="${h.kz>=0?"pos":"neg"}" style="font-size:13px">${gizli?"":yuzde(h.oran,2)+(h.kz>=0?" kâr":" zarar")}</div><div class="${h.kz>=0?"pos":"neg"}" style="font-size:12px">${gizli?"••••":(h.kz>=0?"+":"−")+para(Math.abs(h.kz))}</div>`:""}</div>
+    <div class="r"><div><b>${para(h.deger)}</b></div>${h.kzU!=null?`<div class="${h.kzU>=0?"pos":"neg"}" style="font-size:13px">${gizli?"":yuzde(h.oranU,2)+(h.kzU>=0?" kâr":" zarar")}</div><div class="${h.kzU>=0?"pos":"neg"}" style="font-size:12px">${gizli?"••••":(h.kzU>=0?"+":"−")+fUSD.format(Math.abs(h.kzU))}</div>`:h.kz!=null?`<div class="${h.kz>=0?"pos":"neg"}" style="font-size:13px">${gizli?"":yuzde(h.oran,2)+(h.kz>=0?" kâr":" zarar")}</div><div class="${h.kz>=0?"pos":"neg"}" style="font-size:12px">${gizli?"••••":(h.kz>=0?"+":"−")+para(Math.abs(h.kz))}</div>`:""}</div>
   </div>${acik?`<div class="grup-alt">${siraliListe(o.grup.map(a=>({tek:a}))).map(x=>kurumSatir(x.tek)).join("")}</div>`:""}`;
 }
 document.addEventListener("click", e => {
   const g = e.target.closest("[data-grup]"); if (!g) return;
   e.stopPropagation(); const k = g.dataset.grup; acikGrup.has(k) ? acikGrup.delete(k) : acikGrup.add(k); render();
 }, true);
+/* ABD hisse/ETF maliyetleri her zaman dolar gösterilir */
+function maliyetUSD(a){ if (a.cost==null || sayi(a.cost)==null) return null; const c = sayi(a.cost), q = +a.qty||0;
+  const top = a.costTip==="birim" ? c*q : c; if ((a.costCur||"TRY")==="USD") return top; const mt = maliyetTL(a), k = prices.fx.USD; return (mt!=null && k) ? mt/k : null; }
+const ortMaliyetMetni = (a, q) => { if (a.type==="abd"){ const u = maliyetUSD(a); return (u!=null && q) ? para(u/q, fUSD2) : null; } const mt = maliyetTL(a); return (mt!=null && q) ? para(mt/q, fTL2n) : null; };
 function kurumSatir(a){
   const d = degerTL(a), kh = kzHesap(a), q = +a.qty||0, mt = maliyetTL(a);
   const birim = a.type==="fon"||a.type==="bes" ? "pay" : a.type==="altin" ? "adet/gr" : "adet";
   return `<div class="row tap" data-detay="${esc(a.id)}">
     <div><b>${esc(a.konumNot || (a.konum==="borsa"&&a.borsaAd) || KONUM[a.konum] || "—")}</b>
-      <div class="muted" style="font-size:12px">${gizli?"••••":fN.format(q)} ${birim}${mt!=null&&q?` · ort. ${para(mt/q, fTL2n)}`:""}</div></div>
+      <div class="muted" style="font-size:12px">${gizli?"••••":fN.format(q)} ${birim}${ortMaliyetMetni(a,q)?` · ort. ${ortMaliyetMetni(a,q)}`:""}</div></div>
     <div class="r"><div>${para(d)}</div>${kh?`<div class="${kh.oran>=0?"pos":"neg"}" style="font-size:12px">${gizli?"":yuzde(kh.oran,2)} · ${gizli?"••••":(kh.tutar>=0?"+":"−")+(kh.tl?para(Math.abs(kh.tutar)):pbFmt(kh.pb).format(Math.abs(kh.tutar)))}</div>`:`<div class="muted" style="font-size:11px">maliyet yok</div>`}</div>
     <span class="muted" style="margin-left:6px">›</span></div>`;
 }
@@ -1581,8 +1588,8 @@ function detay(){
     ek("Güncel fiyat", birimFiyat==null ? "—" : (a.type==="abd" ? fUSD2.format(birimFiyat/(kU||1)) : a.type==="kripto" && prices.crypto[cgId(a.symbol)]?.usd ? fUSD2.format(prices.crypto[cgId(a.symbol)].usd) : fTL2n.format(birimFiyat)) + (cf ? " · canlı" : " · elle"));
     if (cf?.ch!=null) ek("Günlük değişim", yuzde(cf.ch), cf.ch>=0?"pos":"neg");
     else if (a.type==="kripto" && prices.crypto[cgId(a.symbol)]?.ch!=null) { const c = prices.crypto[cgId(a.symbol)].ch; ek("24 saatlik değişim", yuzde(c), c>=0?"pos":"neg"); }
-    ek("Ortalama maliyet", mt!=null && q ? para(mt/q, fTL2n) : "girilmemiş", mt==null?"muted":"");
-    ek("Toplam maliyet", mt!=null ? para(mt) : null);
+    ek("Ortalama maliyet", ortMaliyetMetni(a,q) || "girilmemiş", mt==null?"muted":"");
+    ek("Toplam maliyet", mt==null ? null : a.type==="abd" && maliyetUSD(a)!=null ? para(maliyetUSD(a), fUSD2) : para(mt));
     if (kh){ const tutar = kh.tl ? para(Math.abs(kh.tutar)) : pbFmt(kh.pb).format(Math.abs(kh.tutar));
       ek("Kâr / zarar", `${kh.tutar>=0?"+":"−"}${tutar} (${yuzde(kh.oran,2)})`, kh.oran>=0?"pos":"neg");
       if (mt!=null && d!=null && kU && kh.pb!=="USD"){ const usdKz = d/kU - mt/kU; ek("Kâr / zarar (USD, bugünkü kurla)", `${usdKz>=0?"+":"−"}${fUSD2.format(Math.abs(usdKz))}`, usdKz>=0?"pos":"neg"); } }
