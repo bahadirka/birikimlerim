@@ -72,7 +72,7 @@ main a{color:var(--acc)}
 .iz-ch{width:68px;text-align:right;font-weight:600;font-size:14px;white-space:nowrap}
 .fp-satir{display:flex;align-items:center;gap:10px;padding:10px 6px;border-radius:10px}
 .fp-satir.ana{background:color-mix(in srgb,var(--acc) 10%,transparent)}
-.fp-ad{width:70px;flex:none;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fp-ad{width:86px;flex:none;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fp-cubuk{position:relative;flex:1;height:22px}
 .fp-sifir{position:absolute;left:50%;top:-6px;bottom:-6px;width:1px;background:var(--muted);opacity:.5}
 .fp-bar{position:absolute;top:2px;height:18px;border-radius:3px}
@@ -86,6 +86,11 @@ main a{color:var(--acc)}
 .dt-s{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
 .dt-s:last-child{border-bottom:0}
 .dt-s b{text-align:right}
+.bo-bar{display:flex;height:10px;border-radius:5px;overflow:hidden;margin:10px 0 4px;background:var(--line)}
+.bo-bar span{height:100%}
+.bo-blok{margin-top:8px}
+.bo-cip{display:flex;flex-wrap:wrap;gap:5px}
+.bo-cip span{font-size:12px;border:1px solid;border-radius:7px;padding:2px 7px}
 .sirala{display:flex;gap:6px;align-items:center;overflow-x:auto;scrollbar-width:none;margin:0 -16px 4px;padding:2px 16px 6px}
 .sirala::-webkit-scrollbar{display:none}
 .sirala span{flex:none;font-size:12px}
@@ -157,8 +162,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 44; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 45; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:45, t:"2026-11-07", n:["BIST hisselerinin altında hisse özeti: kaç farklı hisse, kaçı BIST 30 / BIST 100'de, kaçı endeks dışı ve değer payları (Ekim–Aralık 2026 listeleri)","Fon karşılaştırmasında TL / USD bazında seçimi; portföyünüzdeki aynı para birimli diğer fonlar da aynı grafikte (ör. dolar fonlarınız birbiriyle)"]},
   {s:44, t:"2026-11-07", n:["Birleşik satıra dokununca kurumlar kısa özetle (adet, ortalama maliyet, kâr/zarar) açılır","Kuruma ya da herhangi bir varlığa dokununca okuma amaçlı detay sayfası: fiyat, maliyet, kâr/zarar TL ve USD, günlük değişim, grafik; Düzenle ve Sil en altta"]},
   {s:43, t:"2026-11-07", n:["Varlıklar'da maliyet kontrolü: maliyeti girilmemiş kayıtlar listelenir, dokununca düzenleme açılır"]},
   {s:42, t:"2026-11-07", n:["Aynı hisse/fon/kripto farklı kurumlardaysa tek satırda birleşik görünür: toplam adet, ağırlıklı ortalama maliyet, toplam değer ve kâr/zarar","Satıra dokununca kurum kırılımı (ör. Garanti + Yapı Kredi) açılır; kayıtlar ayrı kalır"]},
@@ -1146,8 +1152,12 @@ async function fonGetiriAl(){
   return fonGetiri;
 }
 async function fonPerfAc(kod, d="1H"){
-  fpDurum = {kod, d}; fonPerfCiz(); await fonGetiriAl(); if (fpDurum?.kod===kod) fonPerfCiz();
+  const kendi = S?.assets?.find(a=>(a.type==="fon"||a.type==="bes") && String(a.symbol).toUpperCase()===kod);
+  fpDurum = {kod, d, pb: kendi?.tutarCur==="USD" ? "USD" : "TRY"}; fonPerfCiz(); await fonGetiriAl(); if (fpDurum?.kod===kod) fonPerfCiz();
 }
+/* Fonumun hangi para biriminde takip edildiği (döviz fonları birbiriyle) */
+const fonPB = kod => S?.assets?.find(a=>(a.type==="fon"||a.type==="bes") && String(a.symbol).toUpperCase()===kod)?.tutarCur || "TRY";
+const usdBazli = (r, u) => (r==null || u==null) ? null : ((1+r/100)/(1+u/100)-1)*100;
 function fonPerfCiz(){
   const P = fpDurum; if (!P) return;
   let w = document.getElementById("fpPencere");
@@ -1156,7 +1166,15 @@ function fonPerfCiz(){
   let govde;
   if (!g) govde = `<div class="gp-bos" style="height:220px">Yükleniyor…</div>`;
   else {
-    const satir = [...FP_KIYAS.map(([k,l,ik,r])=>({l, ik, r, v:g.kiyas?.[P.d]?.[k]})), {l:P.kod, ik:P.kod, r:"#1baf7a", v:g.fon?.[P.kod]?.[P.d], ana:true}];
+    const K = g.kiyas?.[P.d] || {}, U = K.USD, usd = P.pb==="USD";
+    const cev = v => usd ? usdBazli(v, U) : v;
+    const kiyas = usd
+      ? [["XU100","XU100 ($)","BIST","#e03131",cev(K.XU100)],["ALTIN","ALTIN ($)","ALT","#eda100",cev(K.ALTIN)],["EUR","EUR/USD","EUR","#2a78d6",cev(K.EUR)]]
+      : FP_KIYAS.map(([k,l,ik,r])=>[k,l,ik,r,K[k]]);
+    const benimPB = fonPB(P.kod);
+    const digerleri = [...new Set((S?.assets||[]).filter(a=>(a.type==="fon"||a.type==="bes") && a.symbol && (a.tutarCur||"TRY")===benimPB).map(a=>String(a.symbol).toUpperCase()))].filter(k=>k!==P.kod);
+    const fonlar = [P.kod, ...digerleri].map(k=>({l:k, ik:k, r:k===P.kod?"#1baf7a":"#7048e8", v:cev(g.fon?.[k]?.[P.d]), ana:k===P.kod})).sort((a,b)=>(b.v??-1e9)-(a.v??-1e9));
+    const satir = [...kiyas.map(([k,l,ik,r,v])=>({l, ik, r, v})), ...fonlar];
     const mx = Math.max(1, ...satir.map(x=>Math.abs(x.v ?? 0)));
     govde = satir.map(x => {
       const v = x.v, gen = v==null ? 0 : Math.abs(v)/mx*50, cls = v==null ? "muted" : v>=0 ? "pos" : "neg";
@@ -1165,19 +1183,21 @@ function fonPerfCiz(){
         <b class="fp-y ${cls}">${v==null?"—":yuzde(v)+(v>=0?" ▲":" ▼")}</b></div>`;
     }).join("");
     const ref = g.donem?.[P.d];
-    govde += `<p class="muted" style="font-size:11px;margin:8px 0 0">${ref?`${new Date(ref).toLocaleDateString("tr-TR")} → ${new Date(g.ref||g.tarih).toLocaleDateString("tr-TR")} arası değişim. `:""}Fon getirisi TEFAS fiyatlarından; altın = ons × dolar kuru (TL). ${g.fon?.[P.kod]?.[P.d]==null?"Fon bu dönemde henüz yoktu ya da veri bulunamadı.":""}</p>`;
+    govde += `<p class="muted" style="font-size:11px;margin:8px 0 0">${ref?`${new Date(ref).toLocaleDateString("tr-TR")} → ${new Date(g.ref||g.tarih).toLocaleDateString("tr-TR")} arası değişim. `:""}${P.pb==="USD"?"USD bazında: TL getirisi aynı dönemdeki dolar kuru değişimine göre düzeltildi. ":""}Fon getirisi TEFAS fiyatlarından; altın = ons × dolar kuru. ${fonPB(P.kod)!=="TRY"?`Mor simgeli satırlar portföyünüzdeki diğer ${fonPB(P.kod)} fonlarıdır.`:"Mor simgeli satırlar portföyünüzdeki diğer TL fonlarıdır."} ${g.fon?.[P.kod]?.[P.d]==null?"Fon bu dönemde henüz yoktu ya da veri bulunamadı.":""}</p>`;
   }
   w.innerHTML = `<div class="gp-kart" role="dialog" aria-label="${esc(P.kod)} performans">
     <div class="gp-ust"><span class="mk-ik" style="background:#1baf7a">${esc(P.kod)}</span><b style="flex:1">${esc(P.kod)}</b><button class="iconbtn" data-fp="kapat" aria-label="Kapat">✕</button></div>
     <div class="muted" style="font-size:13px;margin-top:6px">${esc(f?.ad||"")}</div>
     ${f?`<div class="gp-fiyat">${fN6tl.format(f.p)}</div><div class="gp-alt muted">${esc(f.t||"")} fiyatı${f.ch!=null?` · <span class="${f.ch>=0?"pos":"neg"}">${yuzde(f.ch)} günlük</span>`:""}</div>`:""}
-    <div style="font-size:18px;font-weight:700;margin:12px 0 6px">Performans</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 6px"><div style="font-size:18px;font-weight:700">Performans</div>
+      <div class="seg"><button data-fpb="TRY" class="${P.pb==="TRY"?"on":""}">TL bazında</button><button data-fpb="USD" class="${P.pb==="USD"?"on":""}">USD bazında</button></div></div>
     ${govde}
     <div class="fp-donem">${FP_DONEM.map(([k,l])=>`<button data-fp="${k}" class="${P.d===k?"on":""}">${l}</button>`).join("")}</div>
   </div>`;
 }
 document.addEventListener("click", e => {
   if (e.target.id==="fpPencere"){ fpDurum=null; e.target.remove(); return; }
+  const pbb = e.target.closest("[data-fpb]"); if (pbb){ e.stopPropagation(); fpDurum.pb = pbb.dataset.fpb; fonPerfCiz(); return; }
   const b = e.target.closest("[data-fp]");
   if (b){ e.stopPropagation(); if (b.dataset.fp==="kapat"){ fpDurum=null; document.getElementById("fpPencere")?.remove(); } else { fpDurum.d = b.dataset.fp; fonPerfCiz(); } return; }
   const fp = e.target.closest("[data-fonperf]"); if (fp){ e.preventDefault(); e.stopPropagation(); const k = document.querySelector("#f input[name=symbol]")?.value?.trim().toUpperCase(); if (k) fonPerfAc(k); else toast("Önce fon kodunu girin"); }
@@ -1586,8 +1606,31 @@ function varliklar(){
   return ust + sir + Object.keys(TYPES).filter(k=>k!=="alacak"&&k!=="borc"&&(!filtre||k===filtre)).map(k=>{
     const l = S.assets.filter(a=>a.type===k); if (!l.length) return "";
     const usdT = (k==="kripto"||k==="abd") ? l.reduce((x,a)=>x+(usdDeger(a)||0),0) : 0;
-    return `<h2>${TYPES[k].ad} · ${para(toplam(l).v)}${usdT?` · ${para(usdT, fUSD)}`:""}</h2><div class="card">${siraliListe(grupla(l)).map(gSatir).join("")}</div>`;
+    return `<h2>${TYPES[k].ad} · ${para(toplam(l).v)}${usdT?` · ${para(usdT, fUSD)}`:""}</h2><div class="card">${siraliListe(grupla(l)).map(gSatir).join("")}</div>${k==="bist"?bistOzet(l):""}`;
   }).join("");
+}
+/* BIST endeks üyeliği — Ekim–Aralık 2026 dönemi (her çeyrek güncellenir) */
+const ENDEKS_DONEM = "Ekim–Aralık 2026";
+const BIST30 = new Set("AEFES AKBNK ASELS ASTOR BIMAS EKGYO ENKAI EREGL FROTO GARAN GUBRF ISCTR KCHOL KRDMD MGROS PETKM PGSUS SAHOL SASA SISE TAVHL TCELL THYAO TOASO TRALT TRMET TTKOM TUPRS VAKBN YKBNK".split(" "));
+const BIST100 = new Set("AEFES AGHOL AHGAZ AKBNK AKCNS AKFYE AKSA AKSEN ALARK ALBRK ALTNY ANHYT ANSGR ARCLK ASELS ASTOR AYGAZ BERA BIMAS BINHO BRSAN BRYAT BTCIM CANTE CCOLA CIMSA CVKMD CWENE DOAS DOHOL ECILC ECZYT EGEEN EGGUB EKGYO ENERY ENJSA ENKAI ENTRA EREGL EUREN FENER FROTO GARAN GLRMK GLYHO GRSEL GUBRF GWIND HALKB HEKTS ISCTR ISDMR ISMEN KARSN KATMR KCAER KCHOL KORDS KRDMD LMKDC MAVI MGROS MPARK OBAMS ODAS OTKAR OYAKC PAHOL PETKM PGSUS RGYAS RYSAS SAHOL SASA SISE SNGYO SOKM TABGD TAVHL TCELL TCKRC THYAO TKFEN TOASO TRALT TRENJ TRGYO TRMET TSKB TTKOM TTRAK TUKAS TUPRS TURSG ULKER VAKBN VESTL YKBNK ZOREN".split(" "));
+function bistOzet(l){
+  const kod = [...new Set(l.map(a=>String(a.symbol||"").toUpperCase()).filter(Boolean))].sort((x,y)=>x.localeCompare(y,"tr"));
+  const b30 = kod.filter(k=>BIST30.has(k)), b100 = kod.filter(k=>BIST100.has(k)), b70 = b100.filter(k=>!BIST30.has(k)), dis = kod.filter(k=>!BIST100.has(k));
+  const deg = ks => l.filter(a=>ks.includes(String(a.symbol).toUpperCase())).reduce((x,a)=>x+(degerTL(a)||0),0);
+  const top = deg(kod) || 1;
+  const blok = (bas, ks, renk) => ks.length ? `<div class="bo-blok"><div class="row" style="padding:6px 0;border:0"><b>${bas}: ${ks.length}</b><span class="muted">${para(deg(ks))} · %${fN2.format(deg(ks)/top*100)}</span></div>
+    <div class="bo-cip">${ks.map(k=>`<span style="border-color:${renk}">${esc(k)}</span>`).join("")}</div></div>` : "";
+  return `<div class="card">
+    <div style="font-size:16px;font-weight:700">Hisse özeti</div>
+    <div class="muted" style="font-size:13px">${kod.length} farklı hisse · ${l.length} kayıt · ${fN.format(l.reduce((x,a)=>x+(+a.qty||0),0))} adet</div>
+    <div class="bo-bar">${[[b30,"#2a78d6"],[b70,"#1baf7a"],[dis,"#9a988f"]].map(([ks,r])=>ks.length?`<span style="width:${deg(ks)/top*100}%;background:${r}"></span>`:"").join("")}</div>
+    <div class="muted" style="font-size:12px">Değer payı: <span style="color:#2a78d6">■</span> BIST 30 · <span style="color:#1baf7a">■</span> BIST 100 (30 dışı) · <span style="color:#9a988f">■</span> endeks dışı</div>
+    ${blok("BIST 30'da", b30, "#2a78d6")}
+    ${blok("BIST 100'de (BIST 30 dışında)", b70, "#1baf7a")}
+    <div class="muted" style="font-size:13px;margin:4px 0">BIST 100 toplamı: <b>${b100.length}</b> hisse</div>
+    ${blok("BIST 100 dışında", dis, "#9a988f")}
+    <p class="muted" style="font-size:11px;margin:8px 0 0">Endeks listeleri ${ENDEKS_DONEM} dönemine göredir; Borsa İstanbul her çeyrek günceller.</p>
+  </div>`;
 }
 
 function satirBA(a){
