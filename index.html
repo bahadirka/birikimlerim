@@ -190,8 +190,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 52; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 53; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:53, t:"2026-11-07", n:["İçe aktarma bağlantısı fonları da doğru adla gösterir ve eklenen gruba gider"]},
   {s:52, t:"2026-11-07", n:["PDF rapor: kurum ve miktar varlık adının altına alındı, sütunlar artık karışmıyor","Her grubun altında etiketli özet: Toplam değer · Toplam maliyet · Kâr / zarar (renkli, tutar ve yüzde)","Her satırda kâr/zarar yüzdesi ve tutarı ayrı ayrı","Gruplar değeri en yüksekten en düşüğe sıralanır"]},
   {s:51, t:"2026-11-07", n:["Haberler: sahip olduğunuz ve izlediğiniz hisselerin son haberleri (Özet → Haberler, ayrıca her hissenin detayında)","Enflasyona karşı: portföyünüz TÜFE, dolar, altın ve BIST 100 ile karşılaştırılır; reel getiri ve \"dolar alsaydım\" farkı","Durum kartları: trend, RSI, 52 haftalık aralık, analist hedefi ve yoğunlaşma uyarıları — bilgi amaçlı, tavsiye değil","Fon karşılaştırmasına TÜFE eklendi"]},
   {s:50, t:"2026-11-07", n:["Rapor: istediğiniz yatırım gruplarını seçip renkli, grafikli PDF özet oluşturun; WhatsApp veya e-postayla paylaşın","Seçenekler: kalem kalem liste, tutarları gizleme (yalnız yüzdeler), TL / USD / EUR","Özet sayfasının altında ve Ayarlar'da \"Rapor oluştur\" düğmesi"]},
@@ -1154,11 +1155,11 @@ let iceBekleyen = (() => { try { const m = location.hash.match(/#ice=([A-Za-z0-9
   return Array.isArray(j.a) ? j : null; } catch { return null; } })();
 function iceAktarKontrol(){
   if (!iceBekleyen || demo || !S) return;
-  const L = iceBekleyen.a, ad = x => canli?.adlar?.[x.t||"bist"]?.[x.s] || x.s;
+  const L = iceBekleyen.a, ad = x => ((x.t==="fon"||x.t==="bes") ? canli?.fon?.[x.s]?.ad : canli?.adlar?.[x.t||"bist"]?.[x.s]) || x.s;
   const w = document.createElement("div"); w.className = "gp"; w.id = "icePencere";
   w.innerHTML = `<div class="gp-kart"><div style="font-size:18px;font-weight:700">Portföye eklensin mi?</div>
     <p class="muted" style="margin:4px 0 8px">${esc(iceBekleyen.n||"")} — ${L.length} kalem. Aynı hisse aynı kurumda zaten varsa adedi güncellenir.</p>
-    ${L.map(x=>`<div class="row"><span><b>${esc(x.s)}</b> <span class="muted">${esc(ad(x))}</span><div class="muted" style="font-size:12px">${esc(x.y)}</div></span><b>${x.q!=null?fN.format(x.q)+" adet":""}${x.c!=null?`<div class="muted" style="font-size:12px;font-weight:400">maliyet ${(x.cc==="USD"?fUSD2:fTL2n).format(x.c)}${x.ct==="toplam"?" toplam":" / adet"}</div>`:""}</b></div>`).join("")}
+    ${L.map(x=>`<div class="row"><span><b>${esc(x.s)}</b> <span class="muted">${esc(ad(x))}</span><div class="muted" style="font-size:12px">${esc(x.y)}</div></span><b>${x.q!=null?fN.format(x.q)+((x.t==="fon"||x.t==="bes")?" pay":" adet"):""}${x.c!=null?`<div class="muted" style="font-size:12px;font-weight:400">maliyet ${(x.cc==="USD"?fUSD2:fTL2n).format(x.c)}${x.ct==="toplam"?" toplam":" / adet"}</div>`:""}</b></div>`).join("")}
     <button class="btn" id="iceEvet">Ekle</button><button class="btn ghost" id="iceHayir">Vazgeç</button></div>`;
   document.body.appendChild(w);
   const kapat = () => { w.remove(); iceBekleyen = null; try { history.replaceState(null, "", location.pathname + location.search); } catch {} };
@@ -1173,8 +1174,9 @@ function iceAktarKontrol(){
       if (ayni){ if (x.q!=null) ayni.qty = x.q; ayni.konumNot = x.y; Object.assign(ayni, mal); guncel++; }
       else { S.assets.push({id:crypto.randomUUID(), type:tip, symbol:x.s, qty:x.q, konum:"araci", konumNot:x.y, ...mal}); yeni++; }
     }
-    kapat(); await kaydet(); tab = "varlik"; filtre = "bist"; render();
-    toast(`${yeni} hisse eklendi${guncel?`, ${guncel} güncellendi`:""}`);
+    const tipler = [...new Set(L.map(x=>x.t||"bist"))];
+    kapat(); await kaydet(); tab = "varlik"; filtre = tipler.length===1 ? tipler[0] : null; render();
+    toast(`${yeni} kalem eklendi${guncel?`, ${guncel} güncellendi`:""}`);
   };
 }
 
