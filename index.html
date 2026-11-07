@@ -190,8 +190,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 54; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 55; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:55, t:"2026-11-08", n:["Kripto: NEAR, ONDO, XTZ, ENJ, EOS, ETHW, NEO ve daha fazla coin için canlı fiyat","İçe aktarma bağlantısı kripto borsası (BtcTurk vb.) kayıtlarını destekler"]},
   {s:54, t:"2026-11-07", n:["İzleme listesi günlük yüzde değişime göre sıralanabilir: en çok yükselen / en çok düşen / kendi sıram"]},
   {s:53, t:"2026-11-07", n:["İçe aktarma bağlantısı fonları da doğru adla gösterir ve eklenen gruba gider"]},
   {s:52, t:"2026-11-07", n:["PDF rapor: kurum ve miktar varlık adının altına alındı, sütunlar artık karışmıyor","Her grubun altında etiketli özet: Toplam değer · Toplam maliyet · Kâr / zarar (renkli, tutar ve yüzde)","Her satırda kâr/zarar yüzdesi ve tutarı ayrı ayrı","Gruplar değeri en yüksekten en düşüğe sıralanır"]},
@@ -374,7 +375,7 @@ const KONUM = {kasa:"Özel kasa", banka:"Banka", araci:"Aracı kurum", emeklilik
 const BORSALAR = ["Binance","BtcTurk","Paribu","OKX","Bybit","Coinbase","Kraken","Bitget","Donanım cüzdanı (Ledger, Trezor…)","Diğer"];
 const VARSAYILAN_KONUM = {altin:"kasa", gumus:"kasa", nakit:"kasa", bist:"araci", abd:"araci", fon:"araci", bes:"emeklilik", kripto:"borsa", mevduat:"banka"};
 const PARA = ["TRY","USD","EUR","GBP"];
-const CG = {BTC:"bitcoin",ETH:"ethereum",USDT:"tether",USDC:"usd-coin",BNB:"binancecoin",SOL:"solana",XRP:"ripple",ADA:"cardano",DOGE:"dogecoin",AVAX:"avalanche-2",DOT:"polkadot",TRX:"tron",LINK:"chainlink",LTC:"litecoin",TON:"the-open-network",SHIB:"shiba-inu",POL:"polygon-ecosystem-token",MATIC:"polygon-ecosystem-token",ATOM:"cosmos",XLM:"stellar"};
+const CG = {BTC:"bitcoin",ETH:"ethereum",USDT:"tether",USDC:"usd-coin",BNB:"binancecoin",SOL:"solana",XRP:"ripple",ADA:"cardano",DOGE:"dogecoin",AVAX:"avalanche-2",DOT:"polkadot",TRX:"tron",LINK:"chainlink",LTC:"litecoin",TON:"the-open-network",SHIB:"shiba-inu",POL:"polygon-ecosystem-token",MATIC:"polygon-ecosystem-token",ATOM:"cosmos",XLM:"stellar",NEAR:"near",ONDO:"ondo-finance",XTZ:"tezos",ENJ:"enjincoin",EOS:"eos",A:"vaulta",ETHW:"ethereum-pow-iou",NEO:"neo",FET:"fetch-ai",GRT:"the-graph",APT:"aptos",ARB:"arbitrum",OP:"optimism",SUI:"sui",PEPE:"pepe",UNI:"uniswap",AAVE:"aave",FIL:"filecoin",ALGO:"algorand",HBAR:"hedera-hashgraph",ICP:"internet-computer",RNDR:"render-token",RENDER:"render-token"};
 const cgId = s => CG[String(s||"").toUpperCase()] || String(s||"").toLowerCase().trim();
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -1163,11 +1164,11 @@ let iceBekleyen = (() => { try { const m = location.hash.match(/#ice=([A-Za-z0-9
   return Array.isArray(j.a) ? j : null; } catch { return null; } })();
 function iceAktarKontrol(){
   if (!iceBekleyen || demo || !S) return;
-  const L = iceBekleyen.a, ad = x => ((x.t==="fon"||x.t==="bes") ? canli?.fon?.[x.s]?.ad : canli?.adlar?.[x.t||"bist"]?.[x.s]) || x.s;
+  const L = iceBekleyen.a, ad = x => ((x.t==="fon"||x.t==="bes") ? canli?.fon?.[x.s]?.ad : x.t==="kripto" ? "" : canli?.adlar?.[x.t||"bist"]?.[x.s]) || (x.t==="kripto" ? "" : x.s);
   const w = document.createElement("div"); w.className = "gp"; w.id = "icePencere";
   w.innerHTML = `<div class="gp-kart"><div style="font-size:18px;font-weight:700">Portföye eklensin mi?</div>
     <p class="muted" style="margin:4px 0 8px">${esc(iceBekleyen.n||"")} — ${L.length} kalem. Aynı hisse aynı kurumda zaten varsa adedi güncellenir.</p>
-    ${L.map(x=>`<div class="row"><span><b>${esc(x.s)}</b> <span class="muted">${esc(ad(x))}</span><div class="muted" style="font-size:12px">${esc(x.y)}</div></span><b>${x.q!=null?fN.format(x.q)+((x.t==="fon"||x.t==="bes")?" pay":" adet"):""}${x.c!=null?`<div class="muted" style="font-size:12px;font-weight:400">maliyet ${(x.cc==="USD"?fUSD2:fTL2n).format(x.c)}${x.ct==="toplam"?" toplam":" / adet"}</div>`:""}</b></div>`).join("")}
+    ${L.map(x=>`<div class="row"><span><b>${esc(x.s)}</b> <span class="muted">${esc(ad(x))}</span><div class="muted" style="font-size:12px">${esc(x.y)}</div></span><b>${x.q!=null?(x.t==="kripto"?new Intl.NumberFormat("tr-TR",{maximumFractionDigits:8}).format(x.q)+" "+x.s:fN.format(x.q)+((x.t==="fon"||x.t==="bes")?" pay":" adet")):""}${x.c!=null?`<div class="muted" style="font-size:12px;font-weight:400">maliyet ${(x.cc==="USD"?fUSD2:fTL2n).format(x.c)}${x.ct==="toplam"?" toplam":" / adet"}</div>`:""}</b></div>`).join("")}
     <button class="btn" id="iceEvet">Ekle</button><button class="btn ghost" id="iceHayir">Vazgeç</button></div>`;
   document.body.appendChild(w);
   const kapat = () => { w.remove(); iceBekleyen = null; try { history.replaceState(null, "", location.pathname + location.search); } catch {} };
@@ -1176,14 +1177,17 @@ function iceAktarKontrol(){
     let yeni = 0, guncel = 0;
     for (const x of L){
       const tip = x.t || "bist";
-      const ayni = S.assets.find(a => a.type===tip && String(a.symbol).toUpperCase()===x.s && ((a.konumNot||"")===x.y || (x.o && (a.konumNot||"")===x.o)));
+      const kripto = tip==="kripto";
+      const ayni = S.assets.find(a => a.type===tip && String(a.symbol).toUpperCase()===x.s && ((a.konumNot||"")===x.y || (kripto && (a.borsaAd||"")===x.y) || (x.o && (a.konumNot||"")===x.o)));
       const mal = x.c!=null ? {cost:x.c, costTip:x.ct||"birim", costCur:x.cc||"TRY"} : {};
       if (x.p!=null) Object.assign(mal, {manualPrice:x.p, priceDate:bugun()});
-      if (ayni){ if (x.q!=null) ayni.qty = x.q; ayni.konumNot = x.y; Object.assign(ayni, mal); guncel++; }
-      else { S.assets.push({id:crypto.randomUUID(), type:tip, symbol:x.s, qty:x.q, konum:"araci", konumNot:x.y, ...mal}); yeni++; }
+      const yer = kripto ? {konum:"borsa", borsaAd:x.y, konumNot:""} : {konumNot:x.y};
+      if (ayni){ if (x.q!=null) ayni.qty = x.q; Object.assign(ayni, yer, mal); guncel++; }
+      else { S.assets.push({id:crypto.randomUUID(), type:tip, symbol:x.s, qty:x.q, konum:"araci", ...yer, ...mal}); yeni++; }
     }
     const tipler = [...new Set(L.map(x=>x.t||"bist"))];
     kapat(); await kaydet(); tab = "varlik"; filtre = tipler.length===1 ? tipler[0] : null; render();
+    if (tipler.includes("kripto")) fiyatlariAl();   // yeni coinlerin fiyatını hemen çek
     toast(`${yeni} kalem eklendi${guncel?`, ${guncel} güncellendi`:""}`);
   };
 }
