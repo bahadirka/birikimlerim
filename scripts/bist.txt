@@ -119,3 +119,7 @@ VERUS | Verusa Holding
 YATAS | Yataş
 YEOTK | Yeo Teknoloji
 ZRGYO | Ziraat GYO
+FENER | Fenerbahçe Futbol
+GSRAY | Galatasaray Sportif
+BJKAS | Beşiktaş Futbol Yatırımları
+TSPOR | Trabzonspor Sportif
