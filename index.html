@@ -70,6 +70,17 @@ main a{color:var(--acc)}
 .iz-ad small{display:block;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .iz-fiyat{font-weight:600;font-size:15px;text-align:right;white-space:nowrap}
 .iz-ch{width:68px;text-align:right;font-weight:600;font-size:14px;white-space:nowrap}
+.fp-satir{display:flex;align-items:center;gap:10px;padding:10px 6px;border-radius:10px}
+.fp-satir.ana{background:color-mix(in srgb,var(--acc) 10%,transparent)}
+.fp-ad{width:70px;flex:none;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fp-cubuk{position:relative;flex:1;height:22px}
+.fp-sifir{position:absolute;left:50%;top:-6px;bottom:-6px;width:1px;background:var(--muted);opacity:.5}
+.fp-bar{position:absolute;top:2px;height:18px;border-radius:3px}
+.fp-bar.pos{background:var(--pos)}.fp-bar.neg{background:var(--neg)}
+.fp-y{width:84px;flex:none;text-align:right;font-size:15px;white-space:nowrap}
+.fp-donem{display:flex;gap:4px;margin-top:12px;overflow-x:auto;scrollbar-width:none}
+.fp-donem button{flex:1 0 auto;background:none;border:0;padding:8px 10px;border-radius:16px;font:inherit;font-size:14px;color:var(--muted);cursor:pointer}
+.fp-donem button.on{background:var(--acc);color:#fff;font-weight:700}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .seg button{background:none;border:0;padding:5px 10px;font:inherit;font-size:12px;color:var(--muted);cursor:pointer}
 .seg .segon{background:var(--acc);color:#fff;font-weight:600}
@@ -136,8 +147,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 37; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 38; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:38, t:"2026-11-07", n:["Fon performans karşılaştırması: 1 hafta, 1/3/6 ay, bu yıl, 1 ve 5 yıl getirisi; BIST 100, gram altın, dolar ve euro ile yan yana","İzleme listesinde fona dokunun ya da fon kaydında \"Performansı karşılaştır\""]},
   {s:37, t:"2026-11-07", n:["İçe aktarma bağlantısı alış maliyetlerini de ekleyebilir (kâr/zarar için)"]},
   {s:36, t:"2026-11-07", n:["İçe aktarma bağlantısı yanlış girilmiş kurum adını da düzeltebilir"]},
   {s:35, t:"2026-11-07", n:["İçe aktarma bağlantısı: Claude'un hazırladığı bağlantıyla hisse listesi tek onayla kasaya eklenir","Yeni BIST hisseleri: AGROT, AHGAZ, CVKMD, GIPTA, KZGYO, SDTTR, DMRGD, HATSN"]},
@@ -881,7 +893,7 @@ document.addEventListener("click", e => {
   if (g){ izGrup = g.dataset.izgrup; render(); return; }
   const r = e.target.closest("[data-iz]");
   if (r && Date.now()-izTikEngel < 500) { e.stopPropagation(); return; }
-  if (r){ if (r.dataset.iz.startsWith("f:")) return toast("Fonlar için grafik henüz yok"); grafikAc(r.dataset.iz); }
+  if (r){ if (r.dataset.iz.startsWith("f:")) return fonPerfAc(r.dataset.iz.slice(2)); grafikAc(r.dataset.iz); }
 }, true);
 
 /* Favorilerde basılı tutup sürükleyerek sıralama */
@@ -1107,6 +1119,53 @@ function iceAktarKontrol(){
   };
 }
 
+/* ============ Fon performans karşılaştırması ============ */
+const FP_DONEM = [["1H","1H"],["1A","1A"],["3A","3A"],["6A","6A"],["BY","Bu Yıl"],["1Y","1Y"],["5Y","5Y"]];
+const FP_KIYAS = [["XU100","XU100","BIST","#e03131"],["ALTIN","ALT/TL","ALT","#eda100"],["USD","USD/TL","USD","#2f9e44"],["EUR","EUR/TL","EUR","#2a78d6"]];
+let fonGetiri = null, fonGetiriSon = 0, fpDurum = null;
+async function fonGetiriAl(){
+  if (fonGetiri && Date.now()-fonGetiriSon < 30*60000) return fonGetiri;
+  try { const r = await fetch(HAM+"fon_getiri.json?t="+Math.floor(Date.now()/1800000)); if (r.ok){ fonGetiri = await r.json(); fonGetiriSon = Date.now(); } } catch {}
+  return fonGetiri;
+}
+async function fonPerfAc(kod, d="1H"){
+  fpDurum = {kod, d}; fonPerfCiz(); await fonGetiriAl(); if (fpDurum?.kod===kod) fonPerfCiz();
+}
+function fonPerfCiz(){
+  const P = fpDurum; if (!P) return;
+  let w = document.getElementById("fpPencere");
+  if (!w){ w = document.createElement("div"); w.id="fpPencere"; w.className="gp"; document.body.appendChild(w); }
+  const f = canli?.fon?.[P.kod], g = fonGetiri;
+  let govde;
+  if (!g) govde = `<div class="gp-bos" style="height:220px">Yükleniyor…</div>`;
+  else {
+    const satir = [...FP_KIYAS.map(([k,l,ik,r])=>({l, ik, r, v:g.kiyas?.[P.d]?.[k]})), {l:P.kod, ik:P.kod, r:"#1baf7a", v:g.fon?.[P.kod]?.[P.d], ana:true}];
+    const mx = Math.max(1, ...satir.map(x=>Math.abs(x.v ?? 0)));
+    govde = satir.map(x => {
+      const v = x.v, gen = v==null ? 0 : Math.abs(v)/mx*50, cls = v==null ? "muted" : v>=0 ? "pos" : "neg";
+      return `<div class="fp-satir${x.ana?" ana":""}"><span class="mk-ik iz-ik" style="background:${x.r}">${esc(x.ik)}</span><b class="fp-ad">${esc(x.l)}</b>
+        <div class="fp-cubuk"><span class="fp-sifir"></span>${v==null?"":`<span class="fp-bar ${cls}" style="${v>=0?`left:50%`:`right:50%`};width:${gen}%"></span>`}</div>
+        <b class="fp-y ${cls}">${v==null?"—":yuzde(v)+(v>=0?" ▲":" ▼")}</b></div>`;
+    }).join("");
+    const ref = g.donem?.[P.d];
+    govde += `<p class="muted" style="font-size:11px;margin:8px 0 0">${ref?`${new Date(ref).toLocaleDateString("tr-TR")} → ${new Date(g.ref||g.tarih).toLocaleDateString("tr-TR")} arası değişim. `:""}Fon getirisi TEFAS fiyatlarından; altın = ons × dolar kuru (TL). ${g.fon?.[P.kod]?.[P.d]==null?"Fon bu dönemde henüz yoktu ya da veri bulunamadı.":""}</p>`;
+  }
+  w.innerHTML = `<div class="gp-kart" role="dialog" aria-label="${esc(P.kod)} performans">
+    <div class="gp-ust"><span class="mk-ik" style="background:#1baf7a">${esc(P.kod)}</span><b style="flex:1">${esc(P.kod)}</b><button class="iconbtn" data-fp="kapat" aria-label="Kapat">✕</button></div>
+    <div class="muted" style="font-size:13px;margin-top:6px">${esc(f?.ad||"")}</div>
+    ${f?`<div class="gp-fiyat">${fN6tl.format(f.p)}</div><div class="gp-alt muted">${esc(f.t||"")} fiyatı${f.ch!=null?` · <span class="${f.ch>=0?"pos":"neg"}">${yuzde(f.ch)} günlük</span>`:""}</div>`:""}
+    <div style="font-size:18px;font-weight:700;margin:12px 0 6px">Performans</div>
+    ${govde}
+    <div class="fp-donem">${FP_DONEM.map(([k,l])=>`<button data-fp="${k}" class="${P.d===k?"on":""}">${l}</button>`).join("")}</div>
+  </div>`;
+}
+document.addEventListener("click", e => {
+  if (e.target.id==="fpPencere"){ fpDurum=null; e.target.remove(); return; }
+  const b = e.target.closest("[data-fp]");
+  if (b){ e.stopPropagation(); if (b.dataset.fp==="kapat"){ fpDurum=null; document.getElementById("fpPencere")?.remove(); } else { fpDurum.d = b.dataset.fp; fonPerfCiz(); } return; }
+  const fp = e.target.closest("[data-fonperf]"); if (fp){ e.preventDefault(); e.stopPropagation(); const k = document.querySelector("#f input[name=symbol]")?.value?.trim().toUpperCase(); if (k) fonPerfAc(k); else toast("Önce fon kodunu girin"); }
+}, true);
+
 function kivilcim(seri, yon){
   if (!seri || seri.length < 3) return "";
   const mn = Math.min(...seri), mx = Math.max(...seri), rg = (mx-mn) || 1, W=160, H=48;
@@ -1229,6 +1288,7 @@ function fonFormu(a, v){
       <label>Pay adedi</label><input name="qty" inputmode="decimal" value="${v("qty")}">
       <label>Birim pay fiyatı — TEFAS fiyatı bulunursa otomatik (TL) kullanılır, bulunmazsa bu</label><div style="display:flex;gap:8px"><input name="manualPrice" inputmode="decimal" value="${v("manualPrice")}" style="flex:2"><select style="flex:1" name="fiyatCur">${["TRY","USD","EUR"].map(c=>`<option value="${c}" ${(a.fiyatCur||"TRY")===c?"selected":""}>${c==="TRY"?"TL":c}</option>`).join("")}</select></div>
     </details>
+    <button class="btn ghost" type="button" data-fonperf="1" style="margin-top:10px">Performansı karşılaştır (BIST 100, altın, dolar, euro)</button>
     <p class="muted">Tutarı girerseniz pay adedi TEFAS fiyatından hesaplanır; sonra değer her gün kendiliğinden güncellenir. Ayda bir yeni tutarı girmeniz yeterli.</p>`;
 }
 const trKucuk = x => String(x||"").toLocaleLowerCase("tr-TR");

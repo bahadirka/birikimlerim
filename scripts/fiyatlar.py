@@ -246,7 +246,7 @@ def fon_getiri(hedef):
         r = requests.get(f"https://raw.githubusercontent.com/{os.environ.get('GITHUB_REPOSITORY','bahadirka/birikimlerim')}/fiyatlar/fon_getiri.json", timeout=20)
         if r.ok:
             eski = r.json()
-            if eski.get("tarih") == bugun.isoformat() and eski.get("fon"):
+            if eski.get("tarih") == bugun.isoformat() and eski.get("ref") and eski.get("fon"):
                 Path(hedef).write_text(r.text, encoding="utf-8"); return
     except Exception:
         pass
@@ -255,8 +255,11 @@ def fon_getiri(hedef):
         while m <= 0: m += 12; y -= 1
         import calendar
         return dt.date(y, m, min(d.day, calendar.monthrange(y, m)[1]))
-    donem = {"1H": bugun - dt.timedelta(days=7), "1A": ay_once(bugun, 1), "3A": ay_once(bugun, 3), "6A": ay_once(bugun, 6),
-             "BY": dt.date(bugun.year - 1, 12, 31), "1Y": ay_once(bugun, 12), "5Y": ay_once(bugun, 60)}
+    # dönemler son fon fiyat gününe göre (hafta sonu/tatilde kaymasın)
+    try: ref = max(dt.date.fromisoformat(v["t"]) for v in out["fon"].values() if v.get("t"))
+    except Exception: ref = bugun
+    donem = {"1H": ref - dt.timedelta(days=7), "1A": ay_once(ref, 1), "3A": ay_once(ref, 3), "6A": ay_once(ref, 6),
+             "BY": dt.date(ref.year - 1, 12, 31), "1Y": ay_once(ref, 12), "5Y": ay_once(ref, 60)}
     h = {"Accept": "application/json", "Content-Type": "application/json",
          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36"}
     def fiyatlar_tarihte(d):
@@ -301,12 +304,12 @@ def fon_getiri(hedef):
         for ad, d in donem.items():
             kiyas[ad] = {}
             for k, c in seri2.items():
-                eski = c[c.index.date <= d]
-                if len(eski) and len(c):
-                    kiyas[ad][k] = round((float(c.iloc[-1]) / float(eski.iloc[-1]) - 1) * 100, 2)
+                eski = c[c.index.date <= d]; son = c[c.index.date <= ref]
+                if len(eski) and len(son):
+                    kiyas[ad][k] = round((float(son.iloc[-1]) / float(eski.iloc[-1]) - 1) * 100, 2)
     except Exception as e:
         out["hata"].append(f"kiyas: {e}")
-    Path(hedef).write_text(json.dumps({"tarih": bugun.isoformat(), "donem": {k: v.isoformat() for k, v in donem.items()},
+    Path(hedef).write_text(json.dumps({"tarih": bugun.isoformat(), "ref": ref.isoformat(), "donem": {k: v.isoformat() for k, v in donem.items()},
                                        "kiyas": kiyas, "fon": {k: v for k, v in getiri.items() if v}},
                                       ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 try:
