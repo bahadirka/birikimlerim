@@ -53,7 +53,8 @@ except Exception as e:
 
 # ---------- Gün içi mini grafik serileri (15 dk) ----------
 SERI = {"XU100": "XU100.IS", "XU030": "XU030.IS", "GSPC": "^GSPC", "IXIC": "^IXIC",
-        "USD": "USDTRY=X", "EUR": "EURTRY=X", "ONS": "GC=F", "AGONS": "SI=F", "BTCUSD": "BTC-USD"}
+        "USD": "USDTRY=X", "EUR": "EURTRY=X", "ONS": "GC=F", "AGONS": "SI=F", "BTCUSD": "BTC-USD",
+        "DJI": "^DJI", "GBP": "GBPTRY=X", "EURUSD": "EURUSD=X", "BRENT": "BZ=F"}
 def seriler():
     import yfinance as yf
     out["seri"] = {}
@@ -207,6 +208,34 @@ try:
     tcmb()
 except Exception as e:
     out["hata"].append(f"tcmb: {e}")
+
+# ---------- Her hisse için grafik dosyası (dokununca yüklenir) ----------
+def hisse_grafik(klasor):
+    import yfinance as yf
+    for grup, ek in (("bist", ".IS"), ("abd", "")):
+        kodlar = sorted(out[grup].keys())
+        if not kodlar: continue
+        tick = [k + ek for k in kodlar]
+        try:
+            y = yf.download(tick, period="1y", interval="1d", group_by="ticker", progress=False, threads=True, auto_adjust=False)
+            h = yf.download(tick, period="5d", interval="30m", group_by="ticker", progress=False, threads=True, auto_adjust=False)
+        except Exception as e:
+            out["hata"].append(f"hisse grafik {grup}: {e}"); continue
+        d = Path(klasor) / grup; d.mkdir(parents=True, exist_ok=True)
+        for k, t in zip(kodlar, tick):
+            try:
+                cy = (y[t] if len(tick) > 1 else y)["Close"].dropna()
+                ch = (h[t] if len(tick) > 1 else h)["Close"].dropna()
+                tv = lambda c: {"t": [int(i.timestamp()) for i in c.index], "v": [round(float(x), 4) for x in c.tolist()]}
+                son = ch.index[-1].date() if len(ch) else None
+                gun = ch[[i.date() == son for i in ch.index]] if son else ch
+                (d / f"{k}.json").write_text(json.dumps({"gun": tv(gun), "hafta": tv(ch), "yil": tv(cy)}, separators=(",", ":")), encoding="utf-8")
+            except Exception:
+                pass
+try:
+    hisse_grafik(sys.argv[2] if len(sys.argv) > 2 else "grafik")
+except Exception as e:
+    out["hata"].append(f"hisse grafik: {e}")
 
 out["say"] = {k: len(out[k]) for k in ("bist", "abd", "fon")}
 Path(sys.argv[1] if len(sys.argv) > 1 else "prices.json").write_text(
