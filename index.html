@@ -104,8 +104,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 28; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 29; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:29, t:"2026-11-07", n:["Özet'te seçilen para birimi (TL / USD / EUR) tüm uygulamada geçerli: varlık listeleri, kategori toplamları, dilim grafik, kasa, borç/alacak ve vadeli mevduat detayları"]},
   {s:28, t:"2026-11-07", n:["Sürüm 27'deki günlük kâr/zarar gösterimi geri alındı; uygulama Sürüm 26 haline döndü"]},
   {s:26, t:"2026-11-07", n:["Hisse eklerken şirket adıyla arama (ör. \"google\" → GOOGL, \"türk hava\" → THYAO)","Listede hisselerin yanında şirket adı görünür"]},
   {s:25, t:"2026-11-07", n:["Yüksek kârlarda (ör. uzun süre tutulan BTC) yanlış \"maliyeti kontrol edin\" uyarısı kaldırıldı; gerçek kâr yüzdesi ve tutarı gösterilir","Düzenleme ekranında girilen maliyetle hesaplanan kâr önizlemesi"]},
@@ -268,15 +269,16 @@ const cgId = s => CG[String(s||"").toUpperCase()] || String(s||"").toLowerCase()
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const sayi = v => { if (v===""||v==null) return null; const n = parseFloat(String(v).replace(/\s/g,"").replace(",", ".")); return isNaN(n) ? null : n; };
 const fTL = new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",maximumFractionDigits:0});
+const fTLn = new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",maximumFractionDigits:0}); // her zaman TL (çevrilmez)
 const fTL2 = new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",maximumFractionDigits:2});
 const fUSD = new Intl.NumberFormat("tr-TR",{style:"currency",currency:"USD",maximumFractionDigits:0});
 const fEUR = new Intl.NumberFormat("tr-TR",{style:"currency",currency:"EUR",maximumFractionDigits:0});
 const fUSD2 = new Intl.NumberFormat("tr-TR",{style:"currency",currency:"USD",maximumFractionDigits:2});
-const PB = {TRY:{ad:"TL", f:()=>fTL, kur:()=>1}, USD:{ad:"USD", f:()=>fUSD, kur:()=>prices.fx.USD}, EUR:{ad:"EUR", f:()=>fEUR, kur:()=>prices.fx.EUR}};
+const PB = {TRY:{ad:"TL", f:()=>fTLn, kur:()=>1}, USD:{ad:"USD", f:()=>fUSD, kur:()=>prices.fx.USD}, EUR:{ad:"EUR", f:()=>fEUR, kur:()=>prices.fx.EUR}};
 let gosterPB = (()=>{ try { return localStorage.getItem("gosterPB") || "TRY"; } catch { return "TRY"; } })();
 const pbPara = (v, pb=gosterPB) => { const k = PB[pb].kur(); return (k ? para(v/k, PB[pb].f()) : "—"); };
 const fN = new Intl.NumberFormat("tr-TR",{maximumFractionDigits:8});
-const para = (v, f=fTL) => gizli ? "••••••" : (v==null ? "—" : f.format(v));
+const para = (v, f=fTL) => { if (gizli) return "••••••"; if (v==null) return "—"; if (f===fTL && typeof gosterPB!=="undefined" && gosterPB!=="TRY"){ const k = PB[gosterPB].kur(); if (k) return PB[gosterPB].f().format(v/k); } return f.format(v); };
 const bugun = () => new Date().toLocaleDateString("sv-SE");
 
 function toast(m){ const t=document.createElement("div"); t.className="toast"; t.textContent=m; document.body.appendChild(t); setTimeout(()=>t.remove(),2200); }
@@ -406,7 +408,7 @@ function usdKarsilik(a, d){
   return `<div style="font-size:14px;font-weight:600">${para(u, fUSD2)}</div>${birim?`<div class="muted" style="font-size:11px">1 ${esc(String(a.symbol||"").toUpperCase())} = ${fUSD2.format(birim)}</div>`:""}`;
 }
 function kzHesap(a){
-  if (a.type==="mevduat"){ const m=mevduatHesap(a), pb=a.cur||"TRY"; return m.ana ? {pb, oran:m.netFaiz/m.ana*100, tutar:m.netFaiz, etiket:"vade sonu kârı"} : null; }
+  if (a.type==="mevduat"){ const m=mevduatHesap(a), k=kurTL(a.cur||"TRY"); return (m.ana && k) ? {pb:"TRY", tl:true, oran:m.netFaiz/m.ana*100, tutar:m.netFaiz*k, etiket:"vade sonu kârı"} : null; }
   const c = sayi(a.cost); if (c==null || !c) return null;
   const pb = kzPB(a), qty = +a.qty||0;
   let maliyet;
@@ -419,7 +421,7 @@ function kzHesap(a){
   if (deger==null){ const d = degerTL(a), k = kurTL(pb); if (d==null || !k) return null; deger = d/k; }
   return {pb, oran:(deger/maliyet-1)*100, tutar:deger-maliyet};
 }
-const pbFmt = pb => pb==="USD" ? fUSD : pb==="EUR" ? fEUR : fTL;
+const pbFmt = pb => pb==="USD" ? fUSD : pb==="EUR" ? fEUR : fTLn;
 function toplam(list){ let v=0, eksik=0, mal=0, malDeger=0; for (const a of list){ if (isBA(a)) continue; const d=degerTL(a); if (d==null) { eksik++; continue; } v+=d; const c=maliyetTL(a); if (c!=null){ mal+=c; malDeger+=d; } } return {v, eksik, kz: mal ? malDeger-mal : null, kzOran: mal ? (malDeger-mal)/mal*100 : null}; }
 
 function gunlukKayit(){
@@ -544,7 +546,7 @@ function piyasaDegerleri(){
   const e = canli?.endeks || {}, sr = canli?.seri || {};
   return [
     {k:"gram24", l:"Gram altın", ik:"Au", ir:"#eda100", v:prices.gold.gram24, ch:prices.ch?.gram24, seri:sr.GRAM},
-    {k:"ceyrek", l:"Çeyrek altın", ik:"¼", ir:"#c98500", v:prices.gold.ceyrek, ch:prices.ch?.ceyrek, f:fTL, seri:sr.GRAM},
+    {k:"ceyrek", l:"Çeyrek altın", ik:"¼", ir:"#c98500", v:prices.gold.ceyrek, ch:prices.ch?.ceyrek, f:fTLn, seri:sr.GRAM},
     {k:"gumus", l:"Gram gümüş", ik:"Ag", ir:"#9a988f", v:prices.silver.gram, ch:prices.ch?.gumus, seri:sr.GUMUS},
     {k:"btc", l:"Bitcoin", ik:"₿", ir:"#f7931a", v:prices.crypto.bitcoin?.usd, ch:prices.ch?.btcUSD ?? prices.ch?.btc, f:fUSD2, seri:btcSeri || sr.BTCUSD},
     {k:"USD", l:"Dolar", ik:"$", ir:"#2f9e44", v:prices.fx.USD, ch:prices.ch?.USD, f:fTL4, seri:sr.USD},
@@ -706,7 +708,7 @@ function grafik(){
   const pts = s.map((x,i)=>`${(i/(s.length-1)*300).toFixed(1)},${(95-(x.t-mn)/rg*85).toFixed(1)}`).join(" ");
   const fark = vals[vals.length-1]-vals[0];
   return `<svg viewBox="0 0 300 100" preserveAspectRatio="none" style="height:120px"><polyline points="${pts}" fill="none" stroke="var(--acc)" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>
-  <p class="muted">${esc(s[0].d)} → ${esc(s[s.length-1].d)} · <span class="${fark>=0?"pos":"neg"}">${gizli?"••••":(fark>=0?"+":"")+fTL.format(fark)}</span></p>`;
+  <p class="muted">${esc(s[0].d)} → ${esc(s[s.length-1].d)} · <span class="${fark>=0?"pos":"neg"}">${gizli?"••••":(fark>=0?"+":"")+para(fark)}</span></p>`;
 }
 
 function ozet(){
@@ -722,7 +724,7 @@ function ozet(){
     <div class="muted">${Object.keys(PB).filter(k=>k!==gosterPB).map(k=>"≈ "+pbPara(t.net,k)).join(" · ")}</div>
     ${(t.alacak||t.borc)?`<div class="muted">Varlıklar ${pbPara(t.varlik)} · Alacak <span class="pos">+${pbPara(t.alacak)}</span> · Borç <span class="neg">−${pbPara(t.borc)}</span></div>`:""}
     <div class="muted">
-      ${t.kz!=null?`<span class="${t.kz>=0?"pos":"neg"}">${gizli?"••••":(t.kz>=0?"+":"")+fTL.format(t.kz)+" ("+t.kzOran.toFixed(1)+"%)"}</span> <span class="muted">(maliyeti girilenler)</span>`:""}</div>
+      ${t.kz!=null?`<span class="${t.kz>=0?"pos":"neg"}">${gizli?"••••":(t.kz>=0?"+":"")+para(t.kz)+" ("+yuzde(t.kzOran,1)+")"}</span> <span class="muted">(maliyeti girilenler)</span>`:""}</div>
     ${t.eksik?`<p class="muted">${t.eksik} varlığın fiyatı yok, toplama katılmadı.</p>`:""}
   </div>
   ${sira.length?`<div class="card">${pasta(grup, top)}</div>`:`<div class="card"><p class="muted">Henüz varlık yok. "Ekle"den başlayın.</p></div>`}
@@ -754,7 +756,7 @@ function pasta(grup, top){
     <span><span class="dot" style="background:${renkOf(d.k)}"></span>${TYPES[d.k].ad}</span>
     <span class="r"><b>%${(d.o*100).toFixed(d.o<0.1?1:0)}</b> <span class="muted">${para(d.v)}</span> <span class="muted">›</span></span></div>`).join("")}</div>`;
 }
-const fKisa = v => v>=1e6 ? "₺"+new Intl.NumberFormat("tr-TR",{maximumFractionDigits:2}).format(v/1e6)+" mn" : v>=1e3 ? "₺"+new Intl.NumberFormat("tr-TR",{maximumFractionDigits:0}).format(v/1e3)+" bin" : fTL.format(v);
+const fKisa = v0 => { const k = gosterPB!=="TRY" ? PB[gosterPB].kur() : 1, sem = k && gosterPB==="USD" ? "$" : k && gosterPB==="EUR" ? "€" : "₺", v = k ? v0/k : v0; return v>=1e6 ? sem+new Intl.NumberFormat("tr-TR",{maximumFractionDigits:2}).format(v/1e6)+" mn" : v>=1e3 ? sem+new Intl.NumberFormat("tr-TR",{maximumFractionDigits:0}).format(v/1e3)+" bin" : sem+fN2.format(v); };
 
 /* Fon / BES formu: adıyla arama + pay adedi YA DA bugünkü TL tutarı */
 function fonFormu(a, v){
@@ -909,9 +911,9 @@ function miktar(a){
   if (a.type==="nakit") return q+" "+a.cur;
   if (a.type==="fon" || a.type==="bes") return new Intl.NumberFormat("tr-TR",{maximumFractionDigits:2}).format(+a.qty||0)+" pay";
   if (a.type==="mevduat"){
-    const m = mevduatHesap(a), c = a.cur==="TRY"||!a.cur ? " TL" : " "+a.cur;
+    const m = mevduatHesap(a), kk = kurTL(a.cur||"TRY"), P = x => kk ? para(x*kk) : fN.format(Math.round(x));
     const v = m.kalan==null ? "" : m.kalan<0 ? ` · <span class="neg">vade ${-m.kalan} gün önce doldu</span>` : m.kalan===0 ? ` · <span class="neg">vade bugün</span>` : m.kalan<=7 ? ` · <span class="neg">vadeye ${m.kalan} gün</span>` : ` · vadeye ${m.kalan} gün`;
-    return `%${fN.format(m.oran)} · ${fN.format(Math.round(m.ana))}${c}${v}<br>vade sonu <b>${fN.format(Math.round(m.vadeSonu))}${c}</b> · net kâr <span class="pos">+${fN.format(Math.round(m.netFaiz))}${c} (${yuzde(m.netFaiz/m.ana*100)})</span>${m.gecen>0&&m.kalan>0?`<br>bugüne kadar işleyen: +${fN.format(Math.round(m.simdi-m.ana))}${c}`:""}`;
+    return `%${fN.format(m.oran)} · ${P(m.ana)}${v}<br>vade sonu <b>${P(m.vadeSonu)}</b> · net kâr <span class="pos">+${P(m.netFaiz)} (${yuzde(m.netFaiz/m.ana*100)})</span>${m.gecen>0&&m.kalan>0?`<br>bugüne kadar işleyen: +${P(m.simdi-m.ana)}`:""}`;
   }
   return q+" adet";
 }
@@ -921,7 +923,7 @@ function satir(a){
   return `<div class="row tap" data-edit="${esc(a.id)}">
     <div><div>${esc(etiket(a))}${a.konum==="kasa"?'<span class="tag">kasa</span>':""}</div>
     <div class="muted">${miktar(a)}${cf?` · <span class="pos">canlı</span> ${a.type==="abd"?"$"+fN.format(cf.p):fN.format(cf.p)+" TL"}${cf.ch!=null?` <span class="${cf.ch>=0?"pos":"neg"}">${cf.ch>=0?"+":""}${cf.ch}%</span>`:""}${a.type==="fon"||a.type==="bes"?" · "+esc(cf.t||""):""}`:""}${elle?` · elle fiyat${a.fiyatCur&&a.fiyatCur!=="TRY"?" ("+a.fiyatCur+")":""}${a.priceDate?" · "+esc(a.priceDate):""}`:""}${a.konum==="borsa"&&a.borsaAd?" · "+esc(a.borsaAd):""}${a.konumNot?" · "+esc(a.konumNot):""}</div></div>
-    <div class="r"><div>${para(d)}</div>${usdKarsilik(a, d)}${(()=>{ if (!(a.tutarCur&&a.tutarCur!=="TRY"&&d!=null)) return ""; const k = (cf && tcmbKur(cf.t, a.tutarCur)) || kurTL(a.tutarCur); return k ? `<div class="muted">≈ ${para(d/k, a.tutarCur==="USD"?fUSD:fEUR)}</div>` : ""; })()}${kz!=null?(false?``:`<div class="${kz>=0?"pos":"neg"}" style="font-size:13px">${gizli?"":yuzde(kz,2)+(kz>=0?" kâr":" zarar")}</div><div class="${kz>=0?"pos":"neg"}" style="font-size:12px">${gizli?"••••":(kh.tutar>=0?"+":"−")+pbFmt(kh.pb).format(Math.abs(kh.tutar))}</div>${kh.etiket?`<div class="muted" style="font-size:11px">${kh.etiket}</div>`:""}`):""}</div>
+    <div class="r"><div>${para(d)}</div>${usdKarsilik(a, d)}${(()=>{ if (!(a.tutarCur&&a.tutarCur!=="TRY"&&d!=null)) return ""; const k = (cf && tcmbKur(cf.t, a.tutarCur)) || kurTL(a.tutarCur); return k ? `<div class="muted">≈ ${para(d/k, a.tutarCur==="USD"?fUSD:fEUR)}</div>` : ""; })()}${kz!=null?(false?``:`<div class="${kz>=0?"pos":"neg"}" style="font-size:13px">${gizli?"":yuzde(kz,2)+(kz>=0?" kâr":" zarar")}</div><div class="${kz>=0?"pos":"neg"}" style="font-size:12px">${gizli?"••••":(kh.tutar>=0?"+":"−")+(kh.tl?para(Math.abs(kh.tutar)):pbFmt(kh.pb).format(Math.abs(kh.tutar)))}</div>${kh.etiket?`<div class="muted" style="font-size:11px">${kh.etiket}</div>`:""}`):""}</div>
   </div>`;
 }
 
@@ -980,14 +982,14 @@ function form(){
     case "bist": ozel = hisseAramaHTML(a) + `<label>Hisse kodu (ör. THYAO)</label><input name="symbol" autocapitalize="characters" value="${v("symbol")}"><label>Adet</label><input name="qty" inputmode="decimal" value="${v("qty")}"><label>Güncel fiyat (TL) — canlı fiyat bulunursa otomatik kullanılır, bulunmazsa bu</label><input name="manualPrice" inputmode="decimal" value="${v("manualPrice")}">`; break;
     case "abd": ozel = hisseAramaHTML(a) + `<label>Hisse kodu (ör. AAPL, GOOGL)</label><input name="symbol" autocapitalize="characters" value="${v("symbol")}"><label>Adet</label><input name="qty" inputmode="decimal" value="${v("qty")}"><label>Güncel fiyat (USD) — canlı fiyat bulunursa otomatik kullanılır, bulunmazsa bu</label><input name="manualPrice" inputmode="decimal" value="${v("manualPrice")}">`; break;
     case "fon": case "bes": ozel = fonFormu(a, v); break;
-    case "mevduat": { const m = mevduatHesap(a); ozel = `<label>Banka</label><input name="banka" value="${v("banka")}" placeholder="ör. Garanti BBVA">
+    case "mevduat": { const m = mevduatHesap(a), MPk = kurTL(a.cur||"TRY"), MP = x => MPk ? para(x*MPk) : fN.format(Math.round(x)); ozel = `<label>Banka</label><input name="banka" value="${v("banka")}" placeholder="ör. Garanti BBVA">
       <label>Hesap / şube notu (isteğe bağlı)</label><input name="hesapNot" value="${v("hesapNot")}" placeholder="ör. Kadıköy şubesi, 32 gün otomatik yenilemeli">
       <label>Anapara</label><div style="display:flex;gap:8px"><input name="qty" inputmode="decimal" value="${v("qty")}" style="flex:2"><select style="flex:1" name="cur">${["TRY","USD","EUR","GBP"].map(c=>`<option value="${c}" ${(a.cur||"TRY")===c?"selected":""}>${c==="TRY"?"TL":c}</option>`).join("")}</select></div>
       <label>Yıllık faiz oranı (%)</label><input name="oran" inputmode="decimal" value="${v("oran")}" placeholder="ör. 42">
       <div style="display:flex;gap:8px"><div style="flex:1"><label>Başlangıç</label><input name="bas" type="date" value="${v("bas")||bugun()}"></div><div style="flex:1"><label>Vade sonu</label><input name="vade" type="date" value="${v("vade")}"></div></div>
       <label>Stopaj oranı (%) — bankanızın uyguladığı oran</label><input name="stopaj" inputmode="decimal" value="${v("stopaj")}" placeholder="ör. 15">
       <label>Vade sonu tutarı (isteğe bağlı — bankanın verdiği net tutar; girerseniz hesap yerine bu kullanılır)</label><input name="vadeTutar" inputmode="decimal" value="${v("vadeTutar")}">
-      ${a.qty&&a.vade?`<div class="card" style="margin-top:12px;background:var(--bg)"><div class="row"><span>Süre</span><b>${m.gunToplam} gün</b></div><div class="row"><span>Brüt faiz</span><b>${fN.format(Math.round(m.brut))}</b></div><div class="row"><span>Net faiz (kâr)</span><b class="pos">+${fN.format(Math.round(m.netFaiz))} (${yuzde(m.ana?m.netFaiz/m.ana*100:0)})</b></div>${m.gunToplam?`<div class="row"><span>Yıllık net getiri</span><b>${yuzde(m.ana?m.netFaiz/m.ana*365/m.gunToplam*100:0)}</b></div>`:""}<div class="row"><span>Vade sonu tutarı</span><b>${fN.format(Math.round(m.vadeSonu))}</b></div><div class="row"><span>Bugünkü değer (işlemiş faizle)</span><b>${fN.format(Math.round(m.simdi))}</b></div></div>`:""}`; break; }
+      ${a.qty&&a.vade?`<div class="card" style="margin-top:12px;background:var(--bg)"><div class="row"><span>Süre</span><b>${m.gunToplam} gün</b></div><div class="row"><span>Brüt faiz</span><b>${MP(m.brut)}</b></div><div class="row"><span>Net faiz (kâr)</span><b class="pos">+${MP(m.netFaiz)} (${yuzde(m.ana?m.netFaiz/m.ana*100:0)})</b></div>${m.gunToplam?`<div class="row"><span>Yıllık net getiri</span><b>${yuzde(m.ana?m.netFaiz/m.ana*365/m.gunToplam*100:0)}</b></div>`:""}<div class="row"><span>Vade sonu tutarı</span><b>${MP(m.vadeSonu)}</b></div><div class="row"><span>Bugünkü değer (işlemiş faizle)</span><b>${MP(m.simdi)}</b></div></div>`:""}`; break; }
     case "alacak": case "borc": ozel = `<label>${a.type==="alacak"?"Kimden alacaklısınız?":"Kime borçlusunuz?"} (kişi veya kurum)</label><input name="kisi" value="${v("kisi")}">
       <label>Para birimi</label>${sel("cur",Object.fromEntries(PARA.map(p=>[p,p])),a.cur||"TRY")}<label>Kalan tutar</label><input name="qty" inputmode="decimal" value="${v("qty")}">
       <label>Vade tarihi (isteğe bağlı)</label><input name="vade" type="date" value="${v("vade")}">
