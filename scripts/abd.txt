@@ -73,3 +73,13 @@ ARKK | ARK Innovation ETF
 SMH | VanEck Semiconductor ETF
 SOXX | iShares Semiconductor ETF
 IBIT | iShares Bitcoin ETF
+PALL | abrdn Physical Palladium (Paladyum) ETF
+PPLT | abrdn Physical Platinum (Platin) ETF
+REMX | VanEck Rare Earth & Strategic Metals ETF
+SPPP | Sprott Physical Platinum & Palladium Trust
+COPX | Global X Copper Miners (Bakır) ETF
+SETM | Sprott Energy Transition Materials ETF
+OKLO | Oklo
+EMXC | iShares MSCI Emerging Markets ex China ETF
+EWZ | iShares MSCI Brazil ETF
+EWY | iShares MSCI South Korea ETF
