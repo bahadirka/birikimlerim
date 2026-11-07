@@ -152,8 +152,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 40; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 41; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:41, t:"2026-11-07", n:["Özet'teki dağılım listesinde her kategorinin toplam kâr/zararı (tutar ve yüzde): BIST, ABD hisseleri, fonlar, kripto, vadeli mevduat ve diğerleri"]},
   {s:40, t:"2026-11-07", n:["Varlıklar sıralanabilir: değer, getiri (kâr/zarar %) ve alfabetik; büyükten küçüğe veya küçükten büyüğe. Seçim telefonda hatırlanır"]},
   {s:39, t:"2026-11-07", n:["İçe aktarma bağlantısı elle fiyat da taşıyabilir (canlı fiyatı olmayan kalemler için)"]},
   {s:38, t:"2026-11-07", n:["Fon performans karşılaştırması: 1 hafta, 1/3/6 ay, bu yıl, 1 ve 5 yıl getirisi; BIST 100, gram altın, dolar ve euro ile yan yana","İzleme listesinde fona dokunun ya da fon kaydında \"Performansı karşılaştır\""]},
@@ -1273,9 +1274,12 @@ function pasta(grup, top){
   <svg viewBox="0 0 200 200" style="max-width:240px;margin:0 auto" role="img" aria-label="Varlık dağılımı">${yollar}
     <text x="100" y="94" text-anchor="middle" font-size="11" fill="var(--muted)">Varlıklar</text>
     <text x="100" y="114" text-anchor="middle" font-size="15" font-weight="700" fill="var(--fg)">${gizli?"••••":fKisa(top)}</text></svg>
-  <div style="margin-top:8px">${dil.slice().sort((x,y)=>y.v-x.v).map(d=>`<div class="row tap" data-kat="${d.k}">
-    <span><span class="dot" style="background:${renkOf(d.k)}"></span>${TYPES[d.k].ad}</span>
-    <span class="r"><b>%${(d.o*100).toFixed(d.o<0.1?1:0)}</b> <span class="muted">${para(d.v)}</span> <span class="muted">›</span></span></div>`).join("")}</div>`;
+  <div style="margin-top:8px">${dil.slice().sort((x,y)=>y.v-x.v).map(d=>{
+    const t = toplam(S.assets.filter(a=>a.type===d.k)), kz = t.kz, c = kz==null ? "" : kz>=0 ? "pos" : "neg";
+    return `<div class="row tap" data-kat="${d.k}">
+    <span><span class="dot" style="background:${renkOf(d.k)}"></span>${TYPES[d.k].ad}
+      ${kz!=null?`<div class="${c}" style="font-size:12px;margin-left:14px;font-weight:600">${gizli?"••••":(kz>=0?"+":"−")+para(Math.abs(kz))} (${yuzde(t.kzOran)}) ${kz>=0?"kâr":"zarar"}</div>`:d.k==="nakit"?"":`<div class="muted" style="font-size:11px;margin-left:14px">maliyet girilmemiş</div>`}</span>
+    <span class="r"><b>%${(d.o*100).toFixed(d.o<0.1?1:0)}</b> <span class="muted">${para(d.v)}</span> <span class="muted">›</span></span></div>`; }).join("")}</div>`;
 }
 const fKisa = v0 => { const k = gosterPB!=="TRY" ? PB[gosterPB].kur() : 1, sem = k && gosterPB==="USD" ? "$" : k && gosterPB==="EUR" ? "€" : "₺", v = k ? v0/k : v0; return v>=1e6 ? sem+new Intl.NumberFormat("tr-TR",{maximumFractionDigits:2}).format(v/1e6)+" mn" : v>=1e3 ? sem+new Intl.NumberFormat("tr-TR",{maximumFractionDigits:0}).format(v/1e3)+" bin" : sem+fN2.format(v); };
 
