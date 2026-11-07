@@ -1,6 +1,6 @@
 """BIST, ABD hisse ve TEFAS fon fiyatlarını toplayıp prices.json yazar.
 Kişisel veri yok: sadece genel piyasa fiyatları."""
-import json, sys, time, datetime as dt
+import json, os, sys, time, datetime as dt
 from pathlib import Path
 
 KOK = Path(__file__).resolve().parent.parent
@@ -236,6 +236,83 @@ try:
     hisse_grafik(sys.argv[2] if len(sys.argv) > 2 else "grafik")
 except Exception as e:
     out["hata"].append(f"hisse grafik: {e}")
+
+# ---------- Fon getirileri ve kıyaslama (günde bir hesaplanır) ----------
+def fon_getiri(hedef):
+    import requests
+    bugun = dt.date.today()
+    # bugün zaten hesaplandıysa yayındaki dosyayı koru
+    try:
+        r = requests.get(f"https://raw.githubusercontent.com/{os.environ.get('GITHUB_REPOSITORY','bahadirka/birikimlerim')}/fiyatlar/fon_getiri.json", timeout=20)
+        if r.ok:
+            eski = r.json()
+            if eski.get("tarih") == bugun.isoformat() and eski.get("fon"):
+                Path(hedef).write_text(r.text, encoding="utf-8"); return
+    except Exception:
+        pass
+    def ay_once(d, n):
+        y, m = d.year, d.month - n
+        while m <= 0: m += 12; y -= 1
+        import calendar
+        return dt.date(y, m, min(d.day, calendar.monthrange(y, m)[1]))
+    donem = {"1H": bugun - dt.timedelta(days=7), "1A": ay_once(bugun, 1), "3A": ay_once(bugun, 3), "6A": ay_once(bugun, 6),
+             "BY": dt.date(bugun.year - 1, 12, 31), "1Y": ay_once(bugun, 12), "5Y": ay_once(bugun, 60)}
+    h = {"Accept": "application/json", "Content-Type": "application/json",
+         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36"}
+    def fiyatlar_tarihte(d):
+        sonuc = {}
+        for tip in ("YAT", "EMK", "BYF"):
+            govde = {"dil": "TR", "fonTipi": tip, "sfonTurKod": None, "fonKod": None, "fonGrup": None,
+                     "basTarih": (d - dt.timedelta(days=8)).strftime("%Y%m%d"), "bitTarih": d.strftime("%Y%m%d"),
+                     "fonTurKod": None, "fonUnvanTip": None, "kurucuKod": None, "fonTurAciklama": None}
+            satir = []
+            for url in TEFAS_URLLER:
+                for _ in range(3):
+                    time.sleep(2)
+                    try:
+                        r = requests.post(url, json=govde, timeout=60, headers={**h, "Referer": url.split("/api/")[0] + "/"})
+                        if r.status_code == 200: satir = r.json().get("resultList") or []
+                    except Exception: satir = []
+                    if satir: break
+                    time.sleep(8)
+                if satir: break
+            for x in satir:
+                k = str(x.get("fonKodu", "")).upper().strip(); t = str(x.get("tarih", ""))[:10]
+                try: p = float(x.get("fiyat") or 0)
+                except Exception: p = 0
+                if k and p > 0 and (k not in sonuc or t >= sonuc[k][0]): sonuc[k] = (t, p)
+        return sonuc
+    simdi = {k: v["p"] for k, v in out["fon"].items()}
+    getiri = {k: {} for k in simdi}
+    for ad, d in donem.items():
+        eski = fiyatlar_tarihte(d)
+        for k, p0 in eski.items():
+            if k in simdi and p0[1] > 0:
+                getiri[k][ad] = round((simdi[k] / p0[1] - 1) * 100, 2)
+    # kıyaslama: BIST 100, gram altın (ons × dolar), dolar, euro
+    kiyas = {}
+    try:
+        import yfinance as yf
+        df = yf.download(["XU100.IS", "USDTRY=X", "EURTRY=X", "GC=F"], period="6y", interval="1d", group_by="ticker", progress=False, auto_adjust=False)
+        seri = {t: df[t]["Close"].dropna() for t in ["XU100.IS", "USDTRY=X", "EURTRY=X", "GC=F"]}
+        import pandas as pd
+        alt = (seri["GC=F"] * seri["USDTRY=X"].reindex(seri["GC=F"].index, method="ffill")).dropna()
+        seri2 = {"XU100": seri["XU100.IS"], "ALTIN": alt, "USD": seri["USDTRY=X"], "EUR": seri["EURTRY=X"]}
+        for ad, d in donem.items():
+            kiyas[ad] = {}
+            for k, c in seri2.items():
+                eski = c[c.index.date <= d]
+                if len(eski) and len(c):
+                    kiyas[ad][k] = round((float(c.iloc[-1]) / float(eski.iloc[-1]) - 1) * 100, 2)
+    except Exception as e:
+        out["hata"].append(f"kiyas: {e}")
+    Path(hedef).write_text(json.dumps({"tarih": bugun.isoformat(), "donem": {k: v.isoformat() for k, v in donem.items()},
+                                       "kiyas": kiyas, "fon": {k: v for k, v in getiri.items() if v}},
+                                      ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+try:
+    fon_getiri(str(Path(sys.argv[2] if len(sys.argv) > 2 else "grafik").parent / "fon_getiri.json"))
+except Exception as e:
+    out["hata"].append(f"fon getiri: {e}")
 
 out["say"] = {k: len(out[k]) for k in ("bist", "abd", "fon")}
 Path(sys.argv[1] if len(sys.argv) > 1 else "prices.json").write_text(

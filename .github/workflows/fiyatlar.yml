@@ -15,7 +15,7 @@ concurrency:
 jobs:
   topla:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -29,6 +29,7 @@ jobs:
           git init -q -b fiyatlar
           cp /tmp/prices.json .
           cp -r /tmp/grafik . || true
+          cp /tmp/fon_getiri.json . || true
           git config user.name "fiyat-botu"
           git config user.email "fiyat-botu@users.noreply.github.com"
           git add -A
