@@ -147,8 +147,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 38; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 39; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:39, t:"2026-11-07", n:["İçe aktarma bağlantısı elle fiyat da taşıyabilir (canlı fiyatı olmayan kalemler için)"]},
   {s:38, t:"2026-11-07", n:["Fon performans karşılaştırması: 1 hafta, 1/3/6 ay, bu yıl, 1 ve 5 yıl getirisi; BIST 100, gram altın, dolar ve euro ile yan yana","İzleme listesinde fona dokunun ya da fon kaydında \"Performansı karşılaştır\""]},
   {s:37, t:"2026-11-07", n:["İçe aktarma bağlantısı alış maliyetlerini de ekleyebilir (kâr/zarar için)"]},
   {s:36, t:"2026-11-07", n:["İçe aktarma bağlantısı yanlış girilmiş kurum adını da düzeltebilir"]},
@@ -1111,6 +1112,7 @@ function iceAktarKontrol(){
     for (const x of L){
       const ayni = S.assets.find(a => a.type==="bist" && String(a.symbol).toUpperCase()===x.s && ((a.konumNot||"")===x.y || (x.o && (a.konumNot||"")===x.o)));
       const mal = x.c!=null ? {cost:x.c, costTip:x.ct||"birim", costCur:"TRY"} : {};
+      if (x.p!=null) Object.assign(mal, {manualPrice:x.p, priceDate:bugun()});
       if (ayni){ if (x.q!=null) ayni.qty = x.q; ayni.konumNot = x.y; Object.assign(ayni, mal); guncel++; }
       else { S.assets.push({id:crypto.randomUUID(), type:"bist", symbol:x.s, qty:x.q, konum:"araci", konumNot:x.y, date:bugun(), ...mal}); yeni++; }
     }
