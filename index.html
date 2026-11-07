@@ -136,8 +136,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 35; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 36; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:36, t:"2026-11-07", n:["İçe aktarma bağlantısı yanlış girilmiş kurum adını da düzeltebilir"]},
   {s:35, t:"2026-11-07", n:["İçe aktarma bağlantısı: Claude'un hazırladığı bağlantıyla hisse listesi tek onayla kasaya eklenir","Yeni BIST hisseleri: AGROT, AHGAZ, CVKMD, GIPTA, KZGYO, SDTTR, DMRGD, HATSN"]},
   {s:34, t:"2026-11-07", n:["Sanal İşlem (paper trading): 1.000.000 TL + 20.000 $ sanal bakiyeyle gerçek para olmadan al/sat","Kural koyma: fiyat bir seviyenin üstüne çıkarsa / altına düşerse otomatik sanal al veya sat","Zarar kes / kâr al, açık pozisyonlar, kâr/zarar ve işlem geçmişi","İzleme listesinden ya da grafik penceresindeki \"Sanal işlem yap\" düğmesinden açılır"]},
   {s:33, t:"2026-11-07", n:["Piyasa Nabzı artık seçili aralığa göre hesaplanır: Gün içi, Haftalık, Aylık ve Yıllık görünüm ayrı puan verir"]},
@@ -1095,8 +1096,8 @@ function iceAktarKontrol(){
   w.querySelector("#iceEvet").onclick = async () => {
     let yeni = 0, guncel = 0;
     for (const x of L){
-      const ayni = S.assets.find(a => a.type==="bist" && String(a.symbol).toUpperCase()===x.s && (a.konumNot||"")===x.y);
-      if (ayni){ ayni.qty = x.q; guncel++; }
+      const ayni = S.assets.find(a => a.type==="bist" && String(a.symbol).toUpperCase()===x.s && ((a.konumNot||"")===x.y || (x.o && (a.konumNot||"")===x.o)));
+      if (ayni){ ayni.qty = x.q; ayni.konumNot = x.y; guncel++; }
       else { S.assets.push({id:crypto.randomUUID(), type:"bist", symbol:x.s, qty:x.q, konum:"araci", konumNot:x.y, date:bugun()}); yeni++; }
     }
     kapat(); await kaydet(); tab = "varlik"; filtre = "bist"; render();
