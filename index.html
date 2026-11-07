@@ -154,8 +154,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 42; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 43; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:43, t:"2026-11-07", n:["Varlıklar'da maliyet kontrolü: maliyeti girilmemiş kayıtlar listelenir, dokununca düzenleme açılır"]},
   {s:42, t:"2026-11-07", n:["Aynı hisse/fon/kripto farklı kurumlardaysa tek satırda birleşik görünür: toplam adet, ağırlıklı ortalama maliyet, toplam değer ve kâr/zarar","Satıra dokununca kurum kırılımı (ör. Garanti + Yapı Kredi) açılır; kayıtlar ayrı kalır"]},
   {s:41, t:"2026-11-07", n:["Özet'teki dağılım listesinde her kategorinin toplam kâr/zararı (tutar ve yüzde): BIST, ABD hisseleri, fonlar, kripto, vadeli mevduat ve diğerleri"]},
   {s:40, t:"2026-11-07", n:["Varlıklar sıralanabilir: değer, getiri (kâr/zarar %) ve alfabetik; büyükten küçüğe veya küçükten büyüğe. Seçim telefonda hatırlanır"]},
@@ -1505,10 +1506,16 @@ document.addEventListener("click", e => {
   const b = e.target.closest("[data-sirala]"); if (!b) return;
   siralama = b.dataset.sirala; try { localStorage.setItem("siralama", siralama); } catch {} render();
 }, true);
+let malAcik = false;
 function varliklar(){
   if (!S.assets.length) return `<div class="card"><p class="muted">Henüz varlık yok.</p><button class="btn" data-tab="ekle">Varlık ekle</button></div>`;
   const ust = filtre ? `<div class="row" style="padding:0 0 8px"><b>${TYPES[filtre].ad}</b><button class="iconbtn" data-act="filtreYok">Tümünü göster</button></div>` : `<div style="display:flex;justify-content:flex-end;margin-bottom:4px"><button class="iconbtn" data-tab="kasa">Özel Kasa ›</button></div>`;
-  const sir = `<div class="sirala"><span class="muted">Sırala:</span>${SIRALAMA.map(([k,l])=>`<button data-sirala="${k}" class="${siralama===k?"on":""}">${l}</button>`).join("")}</div>`;
+  const eksikMal = S.assets.filter(a => ["bist","abd","kripto","fon","bes","altin","gumus"].includes(a.type) && sayi(a.cost)==null && (!filtre || a.type===filtre));
+  const kontrol = `<div class="card" style="padding:10px 14px;${eksikMal.length?"border-color:var(--neg)":""}">
+    ${eksikMal.length ? `<div class="row tap" data-act="malAc" style="padding:0;border:0"><b class="neg">Maliyeti girilmemiş: ${eksikMal.length} kayıt</b><span class="muted">${malAcik?"▾":"▸"}</span></div>
+      ${malAcik ? eksikMal.map(a=>`<div class="row tap" data-edit="${esc(a.id)}" style="padding:8px 0"><span>${esc(etiket(a))}<div class="muted" style="font-size:12px">${esc(a.konumNot||KONUM[a.konum]||"")} · ${fN.format(+a.qty||0)}</div></span><span class="muted">Maliyet gir ›</span></div>`).join("") : ""}`
+      : `<b class="pos">✓ Tüm kayıtlarda maliyet girilmiş</b>`}</div>`;
+  const sir = kontrol + `<div class="sirala"><span class="muted">Sırala:</span>${SIRALAMA.map(([k,l])=>`<button data-sirala="${k}" class="${siralama===k?"on":""}">${l}</button>`).join("")}</div>`;
   return ust + sir + Object.keys(TYPES).filter(k=>k!=="alacak"&&k!=="borc"&&(!filtre||k===filtre)).map(k=>{
     const l = S.assets.filter(a=>a.type===k); if (!l.length) return "";
     const usdT = (k==="kripto"||k==="abd") ? l.reduce((x,a)=>x+(usdDeger(a)||0),0) : 0;
@@ -1671,6 +1678,7 @@ document.addEventListener("click", async e => {
     }
     if (act==="filtreYok"){ filtre=null; render(); }
     if (act==="snSifirla"){ if (confirm("Sanal hesap sıfırlansın mı? Tüm sanal pozisyonlar, kurallar ve geçmiş silinir.")){ S.sanal = null; snHazir(); await kaydet(true); render(); toast("Sanal hesap sıfırlandı"); } }
+    if (act==="malAc"){ malAcik = !malAcik; render(); }
     if (act==="kilitle") kilitle();
     if (act==="gizle"){ gizli=!gizli; lsSet("gizle",gizli?"1":"0"); render(); }
     if (act==="yenile") fiyatlariAl();
