@@ -131,3 +131,18 @@ KZGYO | Kuzugrup GYO
 SDTTR | SDT Uzay ve Savunma
 DMRGD | DMR Unlu Mamuller
 HATSN | Hat-San Gemi İnşaa
+ALTIN | Darphane Altın Sertifikası
+ADGYO | Adra GYO
+AKFGY | Akfen GYO
+AKFYE | Akfen Yenilenebilir Enerji
+EKSUN | Eksun Gıda
+EYGYO | EYG GYO
+HDFGS | Hedef Girişim
+IHLAS | İhlas Holding
+IZENR | İzdemir Enerji
+KUTPO | Kütahya Porselen
+KZBGY | Kuzey Boru (Kuzeyboru)
+LRSHO | Loras Holding
+TARKM | Tarkim Bitki Koruma
+TRCAS | Turcas Petrol
+VAKKO | Vakko Tekstil
