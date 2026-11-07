@@ -81,6 +81,8 @@ main a{color:var(--acc)}
 .fp-donem{display:flex;gap:4px;margin-top:12px;overflow-x:auto;scrollbar-width:none}
 .fp-donem button{flex:1 0 auto;background:none;border:0;padding:8px 10px;border-radius:16px;font:inherit;font-size:14px;color:var(--muted);cursor:pointer}
 .fp-donem button.on{background:var(--acc);color:#fff;font-weight:700}
+.grup-alt{margin:0 0 6px 12px;padding-left:10px;border-left:2px solid var(--acc)}
+.grup-alt .row{padding:9px 0}
 .sirala{display:flex;gap:6px;align-items:center;overflow-x:auto;scrollbar-width:none;margin:0 -16px 4px;padding:2px 16px 6px}
 .sirala::-webkit-scrollbar{display:none}
 .sirala span{flex:none;font-size:12px}
@@ -152,8 +154,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 41; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 42; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:42, t:"2026-11-07", n:["Aynı hisse/fon/kripto farklı kurumlardaysa tek satırda birleşik görünür: toplam adet, ağırlıklı ortalama maliyet, toplam değer ve kâr/zarar","Satıra dokununca kurum kırılımı (ör. Garanti + Yapı Kredi) açılır; kayıtlar ayrı kalır"]},
   {s:41, t:"2026-11-07", n:["Özet'teki dağılım listesinde her kategorinin toplam kâr/zararı (tutar ve yüzde): BIST, ABD hisseleri, fonlar, kripto, vadeli mevduat ve diğerleri"]},
   {s:40, t:"2026-11-07", n:["Varlıklar sıralanabilir: değer, getiri (kâr/zarar %) ve alfabetik; büyükten küçüğe veya küçükten büyüğe. Seçim telefonda hatırlanır"]},
   {s:39, t:"2026-11-07", n:["İçe aktarma bağlantısı elle fiyat da taşıyabilir (canlı fiyatı olmayan kalemler için)"]},
@@ -1456,9 +1459,42 @@ function satir(a){
 /* Varlık sıralama: alfabetik / getiri / değer, artan-azalan (cihazda hatırlanır) */
 const SIRALAMA = [["deger-","Değer ↓"],["deger+","Değer ↑"],["getiri-","Getiri ↓"],["getiri+","Getiri ↑"],["ad+","A → Z"],["ad-","Z → A"]];
 let siralama = (()=>{ try { return localStorage.getItem("siralama") || "deger-"; } catch { return "deger-"; } })();
+/* Aynı varlık farklı kurumlarda: tek satırda birleşik, dokununca kurum kırılımı */
+const GRUPLU = ["bist","abd","kripto","fon","bes","altin"];
+const acikGrup = new Set();
+const grupAnahtar = a => !GRUPLU.includes(a.type) ? "tek:"+a.id : a.type==="altin" ? "altin:"+(a.unit||"gram24") : a.type+":"+String(a.symbol||"").toUpperCase().trim();
+function grupla(l){
+  const m = new Map();
+  for (const a of l){ const k = grupAnahtar(a); if (!m.has(k)) m.set(k, []); m.get(k).push(a); }
+  return [...m.entries()].map(([k, g]) => g.length===1 ? {tek:g[0]} : {anahtar:k, grup:g});
+}
+const etiketSade = a => (a.type==="bist"||a.type==="abd") ? etiket(a) : etiket(a);
+function gHesap(o){
+  if (o.tek){ const kh = kzHesap(o.tek); return {ad:etiket(o.tek), deger:degerTL(o.tek), oran:kh?.oran ?? null}; }
+  let deger=0, eksik=false, mal=0, malDeger=0, adet=0, malAdet=0;
+  for (const a of o.grup){ const d = degerTL(a), m = maliyetTL(a), q = +a.qty||0; adet += q;
+    if (d==null) { eksik = true; continue; } deger += d; if (m!=null){ mal += m; malDeger += d; malAdet += q; } }
+  return {ad:etiket(o.grup[0]), deger: eksik && !deger ? null : deger, oran: mal ? (malDeger/mal-1)*100 : null, kz: mal ? malDeger-mal : null, adet, malAdet, ort: malAdet ? mal/malAdet : null};
+}
+function gSatir(o){
+  if (o.tek) return satir(o.tek);
+  const h = gHesap(o), a0 = o.grup[0], acik = acikGrup.has(o.anahtar), cf = canliFiyat(a0);
+  const kurumlar = [...new Set(o.grup.map(a=>a.konumNot||KONUM[a.konum]||"—"))];
+  const birim = a0.type==="fon"||a0.type==="bes" ? "pay" : a0.type==="altin" ? "adet/gr" : "adet";
+  return `<div class="row tap grup" data-grup="${esc(o.anahtar)}">
+    <div><div>${esc(h.ad)} <span class="tag">${o.grup.length} kurum</span> <span class="muted">${acik?"▾":"▸"}</span></div>
+      <div class="muted">${gizli?"••••":fN.format(h.adet)} ${birim}${h.ort!=null?` · ort. maliyet ${para(h.ort, fTL2n)}${h.malAdet < h.adet - 1e-9 ? ` (yalnız ${fN.format(h.malAdet)} ${birim} için)` : ""}`:""}${cf?` · <span class="pos">canlı</span> ${a0.type==="abd"?"$"+fN.format(cf.p):fN.format(cf.p)+" TL"}`:""}</div>
+      <div class="muted" style="font-size:12px">${esc(kurumlar.join(" + "))}</div></div>
+    <div class="r"><div><b>${para(h.deger)}</b></div>${h.kz!=null?`<div class="${h.kz>=0?"pos":"neg"}" style="font-size:13px">${gizli?"":yuzde(h.oran,2)+(h.kz>=0?" kâr":" zarar")}</div><div class="${h.kz>=0?"pos":"neg"}" style="font-size:12px">${gizli?"••••":(h.kz>=0?"+":"−")+para(Math.abs(h.kz))}</div>`:""}</div>
+  </div>${acik?`<div class="grup-alt">${siraliListe(o.grup.map(a=>({tek:a}))).map(x=>satir(x.tek)).join("")}</div>`:""}`;
+}
+document.addEventListener("click", e => {
+  const g = e.target.closest("[data-grup]"); if (!g) return;
+  e.stopPropagation(); const k = g.dataset.grup; acikGrup.has(k) ? acikGrup.delete(k) : acikGrup.add(k); render();
+}, true);
 function siraliListe(l){
   const [alan, yon] = [siralama.slice(0,-1), siralama.slice(-1)==="+" ? 1 : -1];
-  const anahtar = a => alan==="ad" ? trKucuk(etiket(a)) : alan==="getiri" ? kzHesap(a)?.oran : degerTL(a);
+  const anahtar = o => { const h = gHesap(o); return alan==="ad" ? trKucuk(h.ad) : alan==="getiri" ? h.oran : h.deger; };
   return l.slice().sort((x,y) => {
     const a = anahtar(x), b = anahtar(y);
     if (a==null && b==null) return 0; if (a==null) return 1; if (b==null) return -1; // bilinmeyenler hep sonda
@@ -1474,9 +1510,9 @@ function varliklar(){
   const ust = filtre ? `<div class="row" style="padding:0 0 8px"><b>${TYPES[filtre].ad}</b><button class="iconbtn" data-act="filtreYok">Tümünü göster</button></div>` : `<div style="display:flex;justify-content:flex-end;margin-bottom:4px"><button class="iconbtn" data-tab="kasa">Özel Kasa ›</button></div>`;
   const sir = `<div class="sirala"><span class="muted">Sırala:</span>${SIRALAMA.map(([k,l])=>`<button data-sirala="${k}" class="${siralama===k?"on":""}">${l}</button>`).join("")}</div>`;
   return ust + sir + Object.keys(TYPES).filter(k=>k!=="alacak"&&k!=="borc"&&(!filtre||k===filtre)).map(k=>{
-    const l = siraliListe(S.assets.filter(a=>a.type===k)); if (!l.length) return "";
+    const l = S.assets.filter(a=>a.type===k); if (!l.length) return "";
     const usdT = (k==="kripto"||k==="abd") ? l.reduce((x,a)=>x+(usdDeger(a)||0),0) : 0;
-    return `<h2>${TYPES[k].ad} · ${para(toplam(l).v)}${usdT?` · ${para(usdT, fUSD)}`:""}</h2><div class="card">${l.map(satir).join("")}</div>`;
+    return `<h2>${TYPES[k].ad} · ${para(toplam(l).v)}${usdT?` · ${para(usdT, fUSD)}`:""}</h2><div class="card">${siraliListe(grupla(l)).map(gSatir).join("")}</div>`;
   }).join("");
 }
 
