@@ -190,8 +190,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 53; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 54; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:54, t:"2026-11-07", n:["İzleme listesi günlük yüzde değişime göre sıralanabilir: en çok yükselen / en çok düşen / kendi sıram"]},
   {s:53, t:"2026-11-07", n:["İçe aktarma bağlantısı fonları da doğru adla gösterir ve eklenen gruba gider"]},
   {s:52, t:"2026-11-07", n:["PDF rapor: kurum ve miktar varlık adının altına alındı, sütunlar artık karışmıyor","Her grubun altında etiketli özet: Toplam değer · Toplam maliyet · Kâr / zarar (renkli, tutar ve yüzde)","Her satırda kâr/zarar yüzdesi ve tutarı ayrı ayrı","Gruplar değeri en yüksekten en düşüğe sıralanır"]},
   {s:51, t:"2026-11-07", n:["Haberler: sahip olduğunuz ve izlediğiniz hisselerin son haberleri (Özet → Haberler, ayrıca her hissenin detayında)","Enflasyona karşı: portföyünüz TÜFE, dolar, altın ve BIST 100 ile karşılaştırılır; reel getiri ve \"dolar alsaydım\" farkı","Durum kartları: trend, RSI, 52 haftalık aralık, analist hedefi ve yoğunlaşma uyarıları — bilgi amaçlı, tavsiye değil","Fon karşılaştırmasına TÜFE eklendi"]},
@@ -926,17 +927,24 @@ function izListeHTML(){
   else if (izGrup==="fon") { L = q.length>=2 ? Object.keys(canli?.fon||{}).map(fonOge).filter(uy).slice(0,60) : L.filter(o=>o.grp==="fon"); }
   else if (izGrup!=="tum") L = L.filter(o=>o.grp===izGrup);
   if (q && izGrup!=="fon") { L = L.filter(uy); if (q.length>=2 && izGrup==="tum") L = L.concat(Object.keys(canli?.fon||{}).map(fonOge).filter(uy).slice(0,20)); }
+  if (izSirala){ const yon = izSirala==="cok" ? -1 : 1;   // bilinmeyen değişim hep sonda
+    L = L.slice().sort((x,y)=> (x.ch==null)-(y.ch==null) || ((x.ch??0)-(y.ch??0))*yon); }
   if (!L.length) return `<p class="muted" style="padding:16px 4px">${izGrup==="fav"?"Henüz favori yok. Bir satırdaki ☆ işaretine dokunarak ekleyin.":izGrup==="fon"&&q.length<2?"Fon adını ya da kodunu yazın (ör. \"altın\", \"YJY\"); ☆ ile favorilere ekleyin.":"Sonuç yok."}</p>`;
   return L.map(o => izSatir(o, fav.has(o.k))).join("");
 }
+let izSirala = (() => { try { return localStorage.getItem("izSirala") || ""; } catch { return ""; } })();
+const IZ_SIRALA = [["","Kendi sıram"],["cok","Yükselen"],["az","Düşen"]];
+document.addEventListener("click", e => { const b = e.target.closest("[data-izsirala]"); if (!b) return; e.stopPropagation();
+  izSirala = b.dataset.izsirala; try { localStorage.setItem("izSirala", izSirala); } catch {} render(); }, true);
 function izListeYenile(){ const el = document.getElementById("izListe"); if (el) el.innerHTML = izListeHTML(); const s = document.getElementById("izSay"); if (s) s.textContent = izFavori().length+" favori"; }
 function izleme(){
   kriptoAl();
   return `<div class="iz-ust"><div><div style="font-size:22px;font-weight:700">İzleme listesi</div><div class="muted" id="izSay">${izFavori().length} favori</div></div><button class="iconbtn" data-tab="sanal">Sanal İşlem ›</button></div>
     <input id="izAra" class="iz-ara" placeholder="Ara (BTC, NVDA, altın, THYAO, fon kodu…)" value="${esc(izAra)}" autocomplete="off">
     <div class="iz-cipler">${IZ_GRUP.map(([k,l])=>`<button data-izgrup="${k}" class="${izGrup===k?"on":""}">${l}</button>`).join("")}</div>
+    <div class="sirala"><span class="muted">Sırala:</span>${IZ_SIRALA.map(([k,l])=>`<button data-izsirala="${k}" class="${izSirala===k?"on":""}">${k==="cok"?"▲ ":k==="az"?"▼ ":""}${l}</button>`).join("")}</div>
     <div class="card iz-kart" id="izListe">${izListeHTML()}</div>
-    ${izGrup==="fav"?'<p class="muted" style="font-size:12px;margin:4px 0">Sırayı değiştirmek için satıra basılı tutun, sonra yukarı/aşağı sürükleyin.</p>':""}
+    ${izGrup==="fav"&&!izSirala?'<p class="muted" style="font-size:12px;margin:4px 0">Sırayı değiştirmek için satıra basılı tutun, sonra yukarı/aşağı sürükleyin.</p>':""}
     <p class="muted" style="font-size:11px">Kripto anlık (CoinGecko); hisse, endeks ve emtia ~15 dk gecikmeli, yarım saatte bir; fonlar günlük. Satıra dokununca grafik açılır.</p>`;
 }
 document.addEventListener("input", e => { if (e.target.id==="izAra"){ izAra = e.target.value; izListeYenile(); } });
@@ -956,7 +964,7 @@ document.addEventListener("click", e => {
 
 /* Favorilerde basılı tutup sürükleyerek sıralama */
 let izSur = null, izTikEngel = 0;
-const izSiralanabilir = () => tab==="izle" && izGrup==="fav" && !izAra.trim();
+const izSiralanabilir = () => tab==="izle" && izGrup==="fav" && !izAra.trim() && !izSirala;
 function izSurBasla(row, y){
   izSur = {row, y0:y, kayma:0, aktif:false, zaman: setTimeout(()=>{
     if (!izSur) return; izSur.aktif = true; row.classList.add("surukle"); try { navigator.vibrate?.(12); } catch {}
