@@ -94,6 +94,8 @@ main a{color:var(--acc)}
 .pasta-bilgi{border:1px solid;border-radius:12px;padding:10px 12px;margin:10px 0 4px}
 .pb-izgara{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin-top:8px;font-size:14px}
 .pb-izgara span{display:block;font-size:11px}
+.rp-k{display:flex;align-items:center;gap:10px;margin:0;padding:10px 0;border-bottom:1px solid var(--line);font-size:15px;color:var(--fg);cursor:pointer}
+.rp-k input{width:20px;height:20px;margin:0;accent-color:var(--acc)}
 .sirala{display:flex;gap:6px;align-items:center;overflow-x:auto;scrollbar-width:none;margin:0 -16px 4px;padding:2px 16px 6px}
 .sirala::-webkit-scrollbar{display:none}
 .sirala span{flex:none;font-size:12px}
@@ -165,8 +167,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 49; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 50; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:50, t:"2026-11-07", n:["Rapor: istediğiniz yatırım gruplarını seçip renkli, grafikli PDF özet oluşturun; WhatsApp veya e-postayla paylaşın","Seçenekler: kalem kalem liste, tutarları gizleme (yalnız yüzdeler), TL / USD / EUR","Özet sayfasının altında ve Ayarlar'da \"Rapor oluştur\" düğmesi"]},
   {s:49, t:"2026-11-07", n:["ABD hisse ve ETF'lerinde ortalama ve toplam maliyet her yerde dolar ($) olarak gösterilir"]},
   {s:48, t:"2026-11-07", n:["Dilim grafikte renge dokununca başka sayfaya gitmeden bilgisi açılır: kategori, toplam değer, portföy payı, kâr/zarar, dolar ve euro karşılığı","Alttaki satırlar eskisi gibi detay sayfasına götürür"]},
   {s:47, t:"2026-11-07", n:["İçe aktarma: dolar cinsinden maliyetler doğru para birimiyle gösterilir"]},
@@ -574,7 +577,7 @@ function render(){
   <header><h1>Birikimlerim${demo?' <span class="tag">DEMO</span>':''}</h1>
     <div><button class="iconbtn" data-act="gizle">${gizli?"Göster":"Gizle"}</button><button class="iconbtn" data-act="kilitle">Kilitle</button>${demo?"":`<button class="iconbtn ${tab==="ayarlar"?"on":""}" data-tab="ayarlar" aria-label="Ayarlar" style="font-size:16px">⚙︎</button>`}</div>
   </header>
-  <main>${tab==="ozet"?ozet():tab==="varlik"?varliklar():tab==="kasa"?kasa():tab==="izle"?izleme():tab==="detay"?detay():tab==="sanal"?sanal():tab==="ba"?borcAlacak():tab==="ayarlar"?ayarlar():form()}</main>
+  <main>${tab==="ozet"?ozet():tab==="varlik"?varliklar():tab==="kasa"?kasa():tab==="izle"?izleme():tab==="rapor"?rapor():tab==="detay"?detay():tab==="sanal"?sanal():tab==="ba"?borcAlacak():tab==="ayarlar"?ayarlar():form()}</main>
   <nav>${[["ozet","Özet"],["varlik","Varlıklar"],["izle","İzleme"],["ba","Borç/Alacak"],["ekle",draft?.id?"Düzenle":"Ekle"]].map(([k,l])=>`<button data-tab="${k}" class="${tab===k?"on":""}">${l}</button>`).join("")}</nav>`;
 }
 
@@ -1211,6 +1214,175 @@ document.addEventListener("click", e => {
   const fp = e.target.closest("[data-fonperf]"); if (fp){ e.preventDefault(); e.stopPropagation(); const k = document.querySelector("#f input[name=symbol]")?.value?.trim().toUpperCase(); if (k) fonPerfAc(k); else toast("Önce fon kodunu girin"); }
 }, true);
 
+/* ============ Rapor (PDF) — telefonda üretilir, paylaş menüsüyle gönderilir ============ */
+const RP = { sec: null, detay: true, gizliTutar: false, pb: null, pdf: null, uretiliyor: false };
+function rpGruplar(){ return Object.keys(TYPES).filter(k => S.assets.some(a=>a.type===k)); }
+function rapor(){
+  const gr = rpGruplar();
+  if (!RP.sec) RP.sec = new Set(gr.filter(k=>!isBA({type:k})));
+  if (!RP.pb) RP.pb = gosterPB;
+  const kutu = (k) => { const l = S.assets.filter(a=>a.type===k), t = isBA({type:k}) ? {v:l.reduce((x,a)=>x+(degerTL(a)||0),0)} : toplam(l);
+    return `<label class="rp-k"><input type="checkbox" data-rpsec="${k}" ${RP.sec.has(k)?"checked":""}><span class="dot" style="background:${TYPES[k].renk}"></span><span style="flex:1">${TYPES[k].ad} <span class="muted">(${l.length})</span></span><span class="muted">${para(t.v)}</span></label>`; };
+  return `<div class="row" style="padding:0 0 6px"><button class="iconbtn" data-tab="ozet" style="margin:0">‹ Özet</button><b>Rapor</b></div>
+  <div class="card"><div style="font-weight:700;margin-bottom:6px">Rapora girecek gruplar</div>
+    ${gr.map(kutu).join("")}
+    <div style="display:flex;gap:8px;margin-top:8px"><button class="iconbtn" data-act="rpHepsi" style="margin:0">Tümünü seç</button><button class="iconbtn" data-act="rpHicbiri" style="margin:0">Hiçbiri</button></div>
+  </div>
+  <div class="card"><div style="font-weight:700;margin-bottom:6px">Seçenekler</div>
+    <label class="rp-k"><input type="checkbox" data-rpopt="detay" ${RP.detay?"checked":""}><span style="flex:1">Kalem kalem liste (her hisse, fon, coin…)</span></label>
+    <label class="rp-k"><input type="checkbox" data-rpopt="gizliTutar" ${RP.gizliTutar?"checked":""}><span style="flex:1">Tutarları gizle (yalnız yüzdeler ve dağılım)</span></label>
+    <div class="row" style="border:0;padding:8px 0 0"><span>Para birimi</span><div class="seg">${["TRY","USD","EUR"].map(k=>`<button data-rppb="${k}" class="${RP.pb===k?"on":""}">${PB[k].ad}</button>`).join("")}</div></div>
+  </div>
+  <button class="btn" data-act="rpOlustur" ${RP.uretiliyor?"disabled":""}>${RP.uretiliyor?"PDF hazırlanıyor…":"PDF oluştur"}</button>
+  ${RP.pdf?`<div class="card" style="margin-top:12px;border-color:var(--pos)"><b class="pos">✓ PDF hazır</b> <span class="muted">(${(RP.pdf.size/1024).toFixed(0)} KB, ${RP.sayfa} sayfa)</span>
+    <button class="btn" data-act="rpPaylas">WhatsApp / e-posta ile paylaş</button>
+    <button class="btn ghost" data-act="rpIndir">İndir / önizle</button></div>`:""}
+  <p class="muted" style="font-size:12px">PDF tamamen telefonunuzda oluşturulur; paylaşana kadar hiçbir yere gönderilmez. Paylaş menüsünden WhatsApp, Mail, AirDrop vb. seçebilirsiniz.</p>
+  ${RP.pdf&&RP.onizle?`<img src="${RP.onizle}" alt="Rapor önizleme" style="width:100%;border-radius:12px;border:1px solid var(--line);margin-top:6px">`:""}`;
+}
+function rpPara(v, pb){ if (RP.gizliTutar) return "•••"; if (v==null) return "—"; const k = PB[pb].kur(); return PB[pb].f().format(k ? v/k : v); }
+/* Rapor çizimi: harici kütüphane yok — sayfalar canvas'a çizilir, JPEG olarak küçük bir PDF'e gömülür */
+const RPW = 1588, RPH = 2246, RPM = 72;          // A4 @ ~192 dpi, kenar boşluğu
+function rpPdf(jpegler){                          // jpegler: [Uint8Array] — her biri bir tam sayfa
+  const enc = new TextEncoder(), parca = [], ofs = []; let n = 0;
+  const yaz = x => { const b = typeof x==="string" ? enc.encode(x) : x; parca.push(b); n += b.length; };
+  const obj = (no, govde, akis) => { ofs[no] = n; yaz(`${no} 0 obj\n${govde}\n`); if (akis){ yaz("stream\n"); yaz(akis); yaz("\nendstream\n"); } yaz("endobj\n"); };
+  const W = 595.28, H = 841.89, sayfa = jpegler.length, kids = [];
+  for (let i=0;i<sayfa;i++) kids.push(`${3+i*3} 0 R`);
+  yaz("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
+  obj(1, "<< /Type /Catalog /Pages 2 0 R >>");
+  obj(2, `<< /Type /Pages /Kids [${kids.join(" ")}] /Count ${sayfa} >>`);
+  jpegler.forEach((j, i) => {
+    const s = 3+i*3, icerik = `q ${W} 0 0 ${H} 0 0 cm /Im0 Do Q`;
+    obj(s, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /XObject << /Im0 ${s+2} 0 R >> >> /Contents ${s+1} 0 R >>`);
+    obj(s+1, `<< /Length ${icerik.length} >>`, enc.encode(icerik));
+    obj(s+2, `<< /Type /XObject /Subtype /Image /Width ${RPW} /Height ${RPH} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${j.length} >>`, j);
+  });
+  const xref = n, adet = 3+sayfa*3;
+  yaz(`xref\n0 ${adet}\n0000000000 65535 f \n` + ofs.slice(1).map(o=>String(o).padStart(10,"0")+" 00000 n \n").join(""));
+  yaz(`trailer\n<< /Size ${adet} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
+  return new Blob(parca, {type:"application/pdf"});
+}
+function rpCiz(){
+  const pb = RP.pb, gr = rpGruplar().filter(k=>RP.sec.has(k)), varlikGr = gr.filter(k=>!isBA({type:k}));
+  const tum = S.assets.filter(a=>varlikGr.includes(a.type)), t = toplam(tum);
+  const parca = varlikGr.map(k=>({k, v: toplam(S.assets.filter(a=>a.type===k)).v})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
+  const top = parca.reduce((x,y)=>x+y.v,0) || 1;
+  const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+  const POS = "#2b8a3e", NEG = "#c92a2a", GRI = "#6b6b70", CIZ = "#ebe8e1";
+  const kzR = v => v==null ? "#868e96" : v>=0 ? POS : NEG;
+  const sayfalar = []; let c, g, y;
+  const yeni = () => { c = document.createElement("canvas"); c.width = RPW; c.height = RPH; g = c.getContext("2d"); g.fillStyle = "#f6f5f2"; g.fillRect(0,0,RPW,RPH); g.textBaseline = "alphabetic"; sayfalar.push(c); y = RPM; };
+  const font = (px, w=400) => g.font = `${w} ${px}px ${FONT}`;
+  const yazi = (s, x, yy, px, w, renk, hiza="left", maks) => { font(px,w); g.fillStyle = renk; g.textAlign = hiza; s = String(s);
+    if (maks && g.measureText(s).width > maks){ while (s.length > 1 && g.measureText(s+"…").width > maks) s = s.slice(0,-1); s += "…"; } g.fillText(s, x, yy); };
+  const kutu = (x, yy, w, h, r, dolgu, kenar) => { g.beginPath(); g.roundRect(x, yy, w, h, r); if (dolgu){ g.fillStyle = dolgu; g.fill(); } if (kenar){ g.strokeStyle = kenar; g.lineWidth = 2; g.stroke(); } };
+  const sigar = h => { if (y + h > RPH - 90){ yeni(); return true; } return false; };
+  const tarih = new Date().toLocaleString("tr-TR",{day:"2-digit",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"});
+  yeni();
+  // Başlık şeridi
+  const gr0 = g.createLinearGradient(0,0,RPW,260); gr0.addColorStop(0,"#9a6f00"); gr0.addColorStop(1,"#e3b94a");
+  g.fillStyle = gr0; g.fillRect(0,0,RPW,250);
+  yazi("PORTFÖY ÖZETİ", RPM, 86, 26, 600, "rgba(255,255,255,.85)");
+  yazi("Birikimlerim", RPM, 160, 68, 800, "#fff");
+  yazi(`${tarih} · ${PB[pb].ad} bazında`, RPM, 212, 28, 400, "rgba(255,255,255,.92)");
+  y = 290;
+  // Özet kartları
+  const KW = (RPW - 2*RPM - 2*24) / 3, KH = 170;
+  const kart = (i, bas, deger, alt, renk="#1d1d1f") => { const x = RPM + i*(KW+24); kutu(x, y, KW, KH, 26, "#fff", CIZ);
+    yazi(bas, x+30, y+50, 24, 500, GRI); yazi(deger, x+30, y+108, 42, 800, renk, "left", KW-60); if (alt) yazi(alt, x+30, y+146, 22, 400, GRI, "left", KW-60); };
+  kart(0, "Toplam değer", rpPara(t.v, pb), prices.fx?.USD && pb!=="USD" && !RP.gizliTutar ? "≈ "+fUSD.format(t.v/prices.fx.USD) : "");
+  kart(1, "Kâr / zarar", t.kz==null ? "—" : RP.gizliTutar ? yuzde(t.kzOran) : (t.kz>=0?"+":"−")+rpPara(Math.abs(t.kz), pb), t.kz==null ? "maliyet girilmemiş" : (RP.gizliTutar ? "maliyeti girilenler" : yuzde(t.kzOran)+" · maliyeti girilenler"), kzR(t.kz));
+  kart(2, "Varlık sayısı", String(tum.length), `${varlikGr.length} grup`);
+  y += KH + 36;
+  // Dağılım (halka + açıklama)
+  if (parca.length){
+    const DH = Math.max(500, 80 + parca.length*62); kutu(RPM, y, RPW-2*RPM, DH, 26, "#fff", CIZ);
+    yazi("Dağılım", RPM+36, y+64, 32, 700, "#1d1d1f");
+    const X = RPM + 250, Y = y + DH/2 + 20, R = 190, r = 118; let a0 = -Math.PI/2;
+    for (const x of parca){ const a1 = a0 + x.v/top*Math.PI*2; g.beginPath(); g.arc(X,Y,R,a0,a1); g.arc(X,Y,r,a1,a0,true); g.closePath(); g.fillStyle = TYPES[x.k].renk; g.fill(); g.strokeStyle = "#fff"; g.lineWidth = 5; g.stroke(); a0 = a1; }
+    const eski = gosterPB; gosterPB = pb;
+    yazi("Toplam", X, Y-10, 24, 500, GRI, "center"); yazi(RP.gizliTutar ? `${parca.length} grup` : fKisa(top), X, Y+36, 38, 800, "#1d1d1f", "center");
+    gosterPB = eski;
+    const LX = RPM + 520, LW = RPW - RPM - 36 - LX; let ly = y + (DH - parca.length*62)/2 + 40;
+    for (const x of parca){ const o = x.v/top;
+      kutu(LX, ly-24, 26, 26, 6, TYPES[x.k].renk); yazi(TYPES[x.k].ad, LX+44, ly, 28, 600, "#1d1d1f", "left", 300);
+      yazi("%"+fN2.format(o*100), LX+LW-(RP.gizliTutar?0:250), ly, 28, 800, "#1d1d1f", "right");
+      if (!RP.gizliTutar) yazi(rpPara(x.v, pb), LX+LW, ly, 26, 400, GRI, "right", 240);
+      kutu(LX+44, ly+14, LW-44, 8, 4, "#f0eee9"); kutu(LX+44, ly+14, Math.max(8,(LW-44)*o), 8, 4, TYPES[x.k].renk);
+      ly += 62; }
+    y += DH + 36;
+  }
+  // Gruplar
+  const SX = [RPM+30, RPM+560, RPM+880, RPM+1150, RPW-RPM-30];   // varlık, kurum, miktar(sağ), değer(sağ), K/Z(sağ)
+  const baslik = (k, tt, devam) => { sigar(240); const ren = TYPES[k].renk;
+    g.save(); g.beginPath(); g.roundRect(RPM, y, RPW-2*RPM, 84, [26,26,0,0]); g.fillStyle = ren; g.fill(); g.restore();
+    yazi(TYPES[k].ad + (devam?" (devam)":""), RPM+30, y+54, 32, 800, "#fff", "left", 600);
+    if (!devam){ const sag = (RP.gizliTutar?"":rpPara(tt.v, pb)) + (tt.kz!=null ? `${RP.gizliTutar?"":"  ·  "}${RP.gizliTutar?"":(tt.kz>=0?"+":"−")+rpPara(Math.abs(tt.kz), pb)+"  "}${yuzde(tt.kzOran)}` : ""); yazi(sag, RPW-RPM-30, y+54, 28, 700, "#fff", "right", 760); }
+    y += 84;
+    if (RP.detay){ g.fillStyle = "#fff"; g.fillRect(RPM, y, RPW-2*RPM, 56);
+      yazi("Varlık", SX[0], y+38, 22, 600, GRI); yazi("Kurum", SX[1], y+38, 22, 600, GRI); yazi("Miktar", SX[2], y+38, 22, 600, GRI, "right");
+      yazi("Değer", SX[3], y+38, 22, 600, GRI, "right"); yazi("Kâr / zarar", SX[4], y+38, 22, 600, GRI, "right"); y += 56; } };
+  const kapat = () => { g.save(); g.beginPath(); g.roundRect(RPM, y, RPW-2*RPM, 22, [0,0,26,26]); g.fillStyle = "#fff"; g.fill(); g.restore(); y += 22 + 30; };
+  for (const k of gr){
+    const l = S.assets.filter(a=>a.type===k); if (!l.length) continue;
+    const ba = isBA({type:k}), tt = ba ? {v:l.reduce((x,a)=>x+(degerTL(a)||0),0), kz:null} : toplam(l);
+    baslik(k, tt, false);
+    if (RP.detay){
+      const sirali = l.slice().sort((x,y2)=>(degerTL(y2)||0)-(degerTL(x)||0));
+      sirali.forEach((a, i) => {
+        if (y + 62 > RPH - 90){ kapat(); yeni(); baslik(k, tt, true); }
+        const kh = kzHesap(a), d = degerTL(a), RH = 62;
+        g.fillStyle = i%2 ? "#fbfaf7" : "#fff"; g.fillRect(RPM, y, RPW-2*RPM, RH);
+        g.fillStyle = TYPES[k].renk; g.fillRect(RPM, y, 6, RH);
+        yazi(etiket(a), SX[0], y+41, 26, 700, "#1d1d1f", "left", 500);
+        yazi(a.konumNot||a.banka||KONUM[a.konum]||"", SX[1], y+41, 24, 400, GRI, "left", 230);
+        yazi(a.type==="mevduat"||ba ? "" : fN.format(+a.qty||0), SX[2], y+41, 24, 400, "#1d1d1f", "right", 250);
+        yazi(rpPara(d, pb), SX[3], y+41, 26, 700, "#1d1d1f", "right", 250);
+        if (kh){ const txt = yuzde(kh.oran,1); font(24,700); const w = g.measureText(txt).width + 28;
+          kutu(SX[4]-w, y+14, w, 36, 18, kh.oran>=0 ? "#e6f4ea" : "#fde8e8"); yazi(txt, SX[4]-14, y+41, 24, 700, kzR(kh.oran), "right"); }
+        else yazi("—", SX[4]-14, y+41, 24, 400, "#adb5bd", "right");
+        y += RH;
+      });
+    }
+    kapat();
+  }
+  sigar(80);
+  yazi("Fiyatlar: hisse/endeks ~15 dk gecikmeli, fonlar TEFAS günlük, altın/döviz serbest piyasa, kripto anlık.", RPM, y+10, 20, 400, "#868e96");
+  yazi("Bu rapor bilgilendirme amaçlıdır, yatırım tavsiyesi değildir.", RPM, y+40, 20, 400, "#868e96");
+  sayfalar.forEach((s, i) => { const gg = s.getContext("2d"); gg.font = `400 20px ${FONT}`; gg.fillStyle = "#868e96"; gg.textAlign = "right";
+    gg.fillText(`Birikimlerim · ${i+1} / ${sayfalar.length}`, RPW-RPM, RPH-40); });
+  return sayfalar;
+}
+async function rpOlustur(){
+  if (!RP.sec.size) return toast("En az bir grup seçin");
+  RP.uretiliyor = true; RP.pdf = null; render();
+  try {
+    await new Promise(r => setTimeout(r, 30));
+    const sayfalar = rpCiz(), jpegler = [];
+    for (const s of sayfalar){ const b = await new Promise(r => s.toBlob(r, "image/jpeg", 0.9)); jpegler.push(new Uint8Array(await b.arrayBuffer())); }
+    RP.pdf = new File([rpPdf(jpegler)], `Birikimlerim-rapor-${bugun()}.pdf`, {type:"application/pdf"}); RP.sayfa = sayfalar.length;
+    RP.onizle = sayfalar[0].toDataURL("image/jpeg", 0.6);
+  } catch(e){ toast("PDF oluşturulamadı: " + (e?.message||e)); }
+  RP.uretiliyor = false; render();
+}
+document.addEventListener("change", e => {
+  const s = e.target.closest("[data-rpsec]"); if (s){ s.checked ? RP.sec.add(s.dataset.rpsec) : RP.sec.delete(s.dataset.rpsec); RP.pdf = null; render(); return; }
+  const o = e.target.closest("[data-rpopt]"); if (o){ RP[o.dataset.rpopt] = o.checked; RP.pdf = null; render(); }
+});
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-rppb]"); if (b){ RP.pb = b.dataset.rppb; RP.pdf = null; render(); return; }
+  const t = e.target.closest("[data-act]"); if (!t) return;
+  if (t.dataset.act==="rpHepsi"){ RP.sec = new Set(rpGruplar()); RP.pdf=null; render(); }
+  if (t.dataset.act==="rpHicbiri"){ RP.sec = new Set(); RP.pdf=null; render(); }
+  if (t.dataset.act==="rpOlustur") rpOlustur();
+  if (t.dataset.act==="rpPaylas" && RP.pdf){
+    if (navigator.canShare && navigator.canShare({files:[RP.pdf]})) { try { await navigator.share({files:[RP.pdf], title:"Portföy özeti"}); } catch(err){ if (err?.name!=="AbortError") toast("Paylaşılamadı"); } }
+    else { toast("Bu tarayıcı dosya paylaşımını desteklemiyor; 'İndir' ile kaydedip gönderin"); }
+  }
+  if (t.dataset.act==="rpIndir" && RP.pdf){ const u = URL.createObjectURL(RP.pdf), l = document.createElement("a"); l.href = u; l.download = RP.pdf.name; l.target = "_blank"; l.click(); setTimeout(()=>URL.revokeObjectURL(u), 60000); }
+});
+
 function kivilcim(seri, yon){
   if (!seri || seri.length < 3) return "";
   const mn = Math.min(...seri), mx = Math.max(...seri), rg = (mx-mn) || 1, W=160, H=48;
@@ -1287,6 +1459,7 @@ function ozet(){
   </div>
   ${sira.length?`<div class="card">${pasta(grup, top)}</div>`:`<div class="card"><p class="muted">Henüz varlık yok. "Ekle"den başlayın.</p></div>`}
   <div class="card"><div class="muted" style="margin-bottom:6px">Portföy değeri</div>${grafik()}</div>
+  <button class="btn ghost" data-tab="rapor">📄 Rapor oluştur · PDF paylaş</button>
   <h2>Piyasa</h2>${fiyatSeridi()}`;
 }
 
@@ -1456,6 +1629,7 @@ function ayarlar(){
     <label>Tekrar</label><input id="np2" type="password" autocomplete="new-password">
     <button class="btn ghost" data-act="parolaDegis">Parolayı değiştir</button>
   </div>`:""}
+  <button class="btn ghost" data-tab="rapor">📄 Rapor oluştur · PDF paylaş</button>
   <button class="btn ghost" data-act="yedek">Şifreli yedek indir</button>
   <button class="btn ghost" data-act="cikisApp">Hesaptan çıkış</button>
   <div class="card"><div><b>Sürüm notları</b></div>${notlarHTML(SURUM_NOTLARI)}</div>
