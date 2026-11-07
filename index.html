@@ -50,6 +50,23 @@ main a{color:var(--acc)}
 .chg{font-size:12px;margin-top:2px;display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline}
 .chg .up,.tick.up{color:var(--pos);font-weight:600}.chg .down,.tick.down{color:var(--neg);font-weight:600}
 .tick{font-size:11px}
+.iz-ust{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px}
+.iz-ara{margin-bottom:10px}
+.iz-cipler{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin:0 -16px 6px;padding-left:16px;padding-right:16px;scrollbar-width:none}
+.iz-cipler::-webkit-scrollbar{display:none}
+.iz-cipler button{flex:none;background:var(--card);border:1px solid var(--line);color:var(--fg);border-radius:12px;padding:7px 13px;font:inherit;font-size:14px;cursor:pointer}
+.iz-cipler button.on{border-color:var(--acc);color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,var(--card))}
+.iz-kart{padding:0 12px}
+.iz-satir{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.iz-satir:last-child{border-bottom:0}
+.iz-yildiz{background:none;border:0;font-size:20px;color:var(--muted);padding:0 2px;cursor:pointer;line-height:1}
+.iz-yildiz.on{color:var(--acc)}
+.iz-satir .iz-ik{width:34px;height:34px;font-size:10px}
+.iz-ad{flex:1;min-width:0}
+.iz-ad b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iz-ad small{display:block;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iz-fiyat{font-weight:600;font-size:15px;text-align:right;white-space:nowrap}
+.iz-ch{width:68px;text-align:right;font-weight:600;font-size:14px;white-space:nowrap}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .seg button{background:none;border:0;padding:5px 10px;font:inherit;font-size:12px;color:var(--muted);cursor:pointer}
 .seg .segon{background:var(--acc);color:#fff;font-weight:600}
@@ -104,8 +121,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 29; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 30; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:30, t:"2026-11-07", n:["İzleme listesi sekmesi: kripto, hisseler (BIST/ABD), endeksler, döviz, emtia (ons altın/gümüş, Brent) ve fonlar","☆ ile favori listenizi oluşturun (şifreli kasada saklanır, eşinizle ortak)","Arama ve kategori düğmeleri; satıra dokununca grafik (Gün/Hafta/Ay/Yıl)","Özel Kasa artık Varlıklar sayfasının sağ üstünde"]},
   {s:29, t:"2026-11-07", n:["Özet'te seçilen para birimi (TL / USD / EUR) tüm uygulamada geçerli: varlık listeleri, kategori toplamları, dilim grafik, kasa, borç/alacak ve vadeli mevduat detayları"]},
   {s:28, t:"2026-11-07", n:["Sürüm 27'deki günlük kâr/zarar gösterimi geri alındı; uygulama Sürüm 26 haline döndü"]},
   {s:26, t:"2026-11-07", n:["Hisse eklerken şirket adıyla arama (ör. \"google\" → GOOGL, \"türk hava\" → THYAO)","Listede hisselerin yanında şirket adı görünür"]},
@@ -344,7 +362,7 @@ async function fiyatlariAl(){
     prices.ch = prices.ch || {};
     const ekle = (k, v) => { if (v!=null && isFinite(v) && Math.abs(v) < 50) prices.ch[k] = v; };
     if (g && g > 100) { ekle("gram24", tch(j,"gram-altin")); ekle("ceyrek", tch(j,"ceyrek-altin")); }
-    ekle("gumus", tch(j,"gumus")); ekle("USD", tch(j,"USD")); ekle("EUR", tch(j,"EUR"));
+    ekle("gumus", tch(j,"gumus")); ekle("USD", tch(j,"USD")); ekle("EUR", tch(j,"EUR")); ekle("GBP", tch(j,"GBP"));
     ok = true;
   } catch(e) {}
   if (ok) { prices.updated = new Date(); anlikHesapla(); gunlukKayit(); }
@@ -493,8 +511,8 @@ function render(){
   <header><h1>Birikimlerim${demo?' <span class="tag">DEMO</span>':''}</h1>
     <div><button class="iconbtn" data-act="gizle">${gizli?"Göster":"Gizle"}</button><button class="iconbtn" data-act="kilitle">Kilitle</button>${demo?"":`<button class="iconbtn ${tab==="ayarlar"?"on":""}" data-tab="ayarlar" aria-label="Ayarlar" style="font-size:16px">⚙︎</button>`}</div>
   </header>
-  <main>${tab==="ozet"?ozet():tab==="varlik"?varliklar():tab==="kasa"?kasa():tab==="ba"?borcAlacak():tab==="ayarlar"?ayarlar():form()}</main>
-  <nav>${[["ozet","Özet"],["varlik","Varlıklar"],["ba","Borç/Alacak"],["kasa","Kasa"],["ekle",draft?.id?"Düzenle":"Ekle"]].map(([k,l])=>`<button data-tab="${k}" class="${tab===k?"on":""}">${l}</button>`).join("")}</nav>`;
+  <main>${tab==="ozet"?ozet():tab==="varlik"?varliklar():tab==="kasa"?kasa():tab==="izle"?izleme():tab==="ba"?borcAlacak():tab==="ayarlar"?ayarlar():form()}</main>
+  <nav>${[["ozet","Özet"],["varlik","Varlıklar"],["izle","İzleme"],["ba","Borç/Alacak"],["ekle",draft?.id?"Düzenle":"Ekle"]].map(([k,l])=>`<button data-tab="${k}" class="${tab===k?"on":""}">${l}</button>`).join("")}</nav>`;
 }
 
 function loginEkrani(){
@@ -572,21 +590,23 @@ const GRAFIK_ANAHTAR = {gram24:"GRAM", ceyrek:"GRAM", gumus:"GUMUS", USD:"USD", 
 const ARALIK = [["gun","Gün"],["hafta","Hafta"],["ay","Ay"],["yil","Yıl"]];
 let grafikDurum = null; // {k, r, t:[], v:[]}
 async function grafikVeri(k, r){
-  if (k==="btc"){
-    const gun = {gun:1, hafta:7, ay:30, yil:365}[r];
-    try { const j = await (await fetch(`https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=${gun}`)).json();
+  if (k==="btc" || k.startsWith("c:")){
+    const gun = {gun:1, hafta:7, ay:30, yil:365}[r], id = k==="btc" ? "bitcoin" : k.slice(2);
+    try { const j = await (await fetch(`https://api.coingecko.com/api/v3/coins/${encodeURIComponent(id)}/market_chart?vs_currency=usd&days=${gun}`)).json();
       let p = j.prices||[]; const adim = Math.ceil(p.length/200); p = p.filter((_,i)=>i%adim===0||i===p.length-1);
       return {t:p.map(x=>x[0]/1000), v:p.map(x=>x[1])}; } catch { return null; }
   }
-  const g = canli?.grafik?.[GRAFIK_ANAHTAR[k]]; if (!g) return null;
+  let g = canli?.grafik?.[GRAFIK_ANAHTAR[k] || k];
+  if (!g && (k.startsWith("b:") || k.startsWith("a:"))) g = await hisseGrafikAl(k);
+  if (!g) return null;
   let d = r==="ay" ? (()=>{ const y=g.yil, sinir=Date.now()/1000-31*86400, i=y.t.findIndex(t=>t>=sinir); return {t:y.t.slice(Math.max(0,i)), v:y.v.slice(Math.max(0,i))}; })() : g[r];
   if (!d || d.v.length<2) return null;
-  const guncel = piyasaDegerleri().find(x=>x.k===k)?.v;
+  const guncel = izBul(k)?.v;
   if (["gram24","ceyrek","gumus"].includes(k) && guncel) { const o = guncel / d.v[d.v.length-1]; d = {t:d.t, v:d.v.map(x=>x*o)}; }
   return d;
 }
 async function grafikAc(k, r="gun"){
-  const d0 = piyasaDegerleri().find(x=>x.k===k); if (!d0) return;
+  const d0 = izBul(k); if (!d0) return;
   grafikDurum = {k, r, t:[], v:[], yukleniyor:true}; grafikCiz();
   const d = await grafikVeri(k, r);
   if (!grafikDurum || grafikDurum.k!==k || grafikDurum.r!==r) return;
@@ -595,7 +615,7 @@ async function grafikAc(k, r="gun"){
 function grafikKapat(){ grafikDurum=null; document.getElementById("grafikPencere")?.remove(); }
 function grafikCiz(){
   const G = grafikDurum; if (!G) return;
-  const d0 = piyasaDegerleri().find(x=>x.k===G.k), f = d0.f||fTL2;
+  const d0 = izBul(G.k), f = d0.f||fTL2;
   let w = document.getElementById("grafikPencere");
   if (!w){ w = document.createElement("div"); w.id="grafikPencere"; w.className="gp"; document.body.appendChild(w); }
   const v = G.v||[], n = v.length, W=340, H=190, PT=10, PB=22;
@@ -607,7 +627,7 @@ function grafikCiz(){
     const X=i=>(i/(n-1))*W, Y=x=>PT+(1-(x-mn)/rg)*(H-PT-PB);
     const yuz=(v[n-1]/v[0]-1)*100, renk = yuz>=0?"var(--pos)":"var(--neg)";
     const yol = v.map((x,i)=>(i?"L":"M")+X(i).toFixed(1)+","+Y(x).toFixed(1)).join(" ");
-    deg = `<span class="${yuz>=0?"pos":"neg"}" style="font-weight:700">${yuzde(yuz)}</span> <span class="muted">${{gun:"bugün",hafta:"son 5 gün",ay:"son 1 ay",yil:"son 1 yıl"}[G.r]}</span>`;
+    deg = `<span class="${yuz>=0?"pos":"neg"}" style="font-weight:700">${yuzde(yuz)}</span> <span class="muted">${{gun:"gün içi",hafta:"son 5 gün",ay:"son 1 ay",yil:"son 1 yıl"}[G.r]}</span>`;
     const tf = ts => { const dt=new Date(ts*1000); return G.r==="gun"||G.r==="hafta" ? dt.toLocaleString("tr-TR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : dt.toLocaleDateString("tr-TR",{day:"2-digit",month:"short",year:G.r==="yil"?"2-digit":undefined}); };
     govde = `<svg id="gpSvg" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;touch-action:none;display:block">
       <line x1="0" x2="${W}" y1="${Y(mx)}" y2="${Y(mx)}" stroke="var(--line)" stroke-dasharray="3 4"/>
@@ -658,6 +678,105 @@ document.addEventListener("click", e => {
 }, true);
 document.addEventListener("keydown", e => { if (e.key==="Escape" && grafikDurum) grafikKapat(); });
 
+/* ============ İzleme listesi ============ */
+const HAM = "https://raw.githubusercontent.com/bahadirka/birikimlerim/fiyatlar/";
+const hisseGrafikOnbellek = {};
+async function hisseGrafikAl(k){
+  if (hisseGrafikOnbellek[k]) return hisseGrafikOnbellek[k];
+  const [g, kod] = [k[0]==="b"?"bist":"abd", k.slice(2)];
+  try { const r = await fetch(HAM+"grafik/"+g+"/"+encodeURIComponent(kod)+".json?t="+Math.floor(Date.now()/600000)); if (!r.ok) return null; return hisseGrafikOnbellek[k] = await r.json(); } catch { return null; }
+}
+let kriptoListe = [], kriptoSon = 0;
+async function kriptoAl(){
+  if (Date.now()-kriptoSon < 60000) return; kriptoSon = Date.now();
+  try { const r = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=60&page=1&price_change_percentage=24h");
+    if (r.ok){ kriptoListe = await r.json(); if (tab==="izle" && screen==="app") izListeYenile(); } } catch {}
+}
+const IZ_GRUP = [["fav","★ Favoriler"],["tum","Tümü"],["kripto","Kripto"],["hisse","Hisseler"],["endeks","Endeksler"],["doviz","Döviz"],["emtia","Emtia"],["fon","Fonlar"]];
+const IZ_VARSAYILAN = ["c:bitcoin","c:ethereum","c:ripple","ONS","AGONS","gram24","USD","EUR","GBP","XU100","GSPC","IXIC","a:NVDA","a:AAPL","a:TSLA"];
+let izGrup = "fav", izAra = "";
+function izEvren(){
+  const e = canli?.endeks || {}, sr = canli?.grafik || {}, son = x => x?.yil?.v?.length ? x.yil.v[x.yil.v.length-1] : null;
+  const sonCh = x => { const v = x?.gun?.v; return v?.length>1 ? (v[v.length-1]/v[0]-1)*100 : null; };
+  const L = [];
+  const piy = Object.fromEntries(piyasaDegerleri().map(d=>[d.k,d]));
+  const ekle = (o) => L.push(o);
+  // kripto
+  for (const c of kriptoListe) ekle({k:"c:"+c.id, l:String(c.symbol).toUpperCase()+"/USD", alt:c.name, grp:"kripto", ik:String(c.symbol).toUpperCase().slice(0,3), ir:"#f7931a", v:c.current_price, ch:c.price_change_percentage_24h, f:c.current_price<1?fUSD6:c.current_price<10?fUSD4:fUSD2});
+  if (!kriptoListe.length && piy.btc) ekle({...piy.btc, k:"c:bitcoin", l:"BTC/USD", alt:"Bitcoin", grp:"kripto"});
+  // emtia
+  const ons = son(sr.ONS), ag = son(sr.AGONS), br = son(sr.BRENT);
+  ekle({k:"ONS", l:"ONS ALTIN", alt:"Altın / USD", grp:"emtia", ik:"XAU", ir:"#eda100", v:ons, ch:sonCh(sr.ONS), f:fUSD2});
+  ekle({k:"AGONS", l:"ONS GÜMÜŞ", alt:"Gümüş / USD", grp:"emtia", ik:"XAG", ir:"#9a988f", v:ag, ch:sonCh(sr.AGONS), f:fUSD2});
+  for (const k of ["gram24","ceyrek","gumus"]) if (piy[k]) ekle({...piy[k], alt:"Serbest piyasa", grp:"emtia"});
+  if (br) ekle({k:"BRENT", l:"BRENT PETROL", alt:"Varil / USD", grp:"emtia", ik:"OIL", ir:"#343a40", v:br, ch:sonCh(sr.BRENT), f:fUSD2});
+  // döviz
+  if (piy.USD) ekle({...piy.USD, l:"USD/TRY", alt:"Dolar", grp:"doviz"});
+  if (piy.EUR) ekle({...piy.EUR, l:"EUR/TRY", alt:"Euro", grp:"doviz"});
+  const gbp = prices.fx.GBP || son(sr.GBP);
+  if (gbp) ekle({k:"GBP", l:"GBP/TRY", alt:"Sterlin", grp:"doviz", ik:"£", ir:"#7048e8", v:gbp, ch:prices.ch?.GBP ?? sonCh(sr.GBP), f:fTL4});
+  const eu = son(sr.EURUSD); if (eu) ekle({k:"EURUSD", l:"EUR/USD", alt:"Parite", grp:"doviz", ik:"€$", ir:"#1864ab", v:eu, ch:sonCh(sr.EURUSD), f:fN4});
+  // endeksler
+  for (const k of ["XU100","XU030","GSPC","IXIC"]) if (piy[k]) ekle({...piy[k], alt:k.startsWith("XU")?"Borsa İstanbul":"ABD", grp:"endeks"});
+  if (e["^DJI"]) ekle({k:"DJI", l:"Dow Jones", alt:"ABD", grp:"endeks", ik:"DJ", ir:"#364fc7", v:e["^DJI"].p, ch:e["^DJI"].ch, f:fN2});
+  // hisseler
+  const ad = canli?.adlar || {};
+  for (const [kod, x] of Object.entries(canli?.bist||{})) ekle({k:"b:"+kod, l:kod, alt:(ad.bist?.[kod]||"")+" · BIST", grp:"hisse", ik:kod.slice(0,3), ir:"#e03131", v:x.p, ch:x.ch, f:fTL2n});
+  for (const [kod, x] of Object.entries(canli?.abd||{})) ekle({k:"a:"+kod, l:kod, alt:(ad.abd?.[kod]||"")+" · ABD", grp:"hisse", ik:kod.slice(0,3), ir:"#364fc7", v:x.p, ch:x.ch, f:fUSD2});
+  return L;
+}
+function fonOge(kod){ const f = canli?.fon?.[kod]; return f ? {k:"f:"+kod, l:kod, alt:f.ad+(f.tip==="EMK"?" · BES":""), grp:"fon", ik:kod, ir:"#1baf7a", v:f.p, ch:f.ch, f:fN6tl} : null; }
+function izBul(k){
+  if (k.startsWith("f:")) return fonOge(k.slice(2));
+  return izEvren().find(x=>x.k===k) || piyasaDegerleri().find(x=>x.k===k) || (k.startsWith("c:") ? {k, l:k.slice(2).toUpperCase(), ik:"₵", ir:"#f7931a", v:null, f:fUSD2} : null);
+}
+const izFavori = () => (S?.izleme && S.izleme.length) ? S.izleme : (S?.izleme ? [] : IZ_VARSAYILAN);
+function izSatir(o, fav){
+  const ch = o.ch, cls = ch==null ? "muted" : ch>0 ? "pos" : ch<0 ? "neg" : "muted";
+  return `<div class="iz-satir" data-iz="${esc(o.k)}">
+    <button class="iz-yildiz ${fav?"on":""}" data-yildiz="${esc(o.k)}" aria-label="${fav?"Favorilerden çıkar":"Favorilere ekle"}">${fav?"★":"☆"}</button>
+    <span class="mk-ik iz-ik" style="background:${o.ir}">${esc(o.ik)}</span>
+    <span class="iz-ad"><b>${esc(o.l)}</b><small>${esc(o.alt||"")}</small></span>
+    <span class="iz-fiyat">${o.v==null?"—":(o.f||fTL2).format(o.v)}</span>
+    <span class="iz-ch ${cls}">${ch==null?"—":yuzde(ch)}</span>
+  </div>`;
+}
+function izListeHTML(){
+  const fav = new Set(izFavori()), q = trKucuk(izAra).trim(), kel = q ? q.split(/\s+/) : [];
+  const uy = o => kel.every(w => trKucuk(o.l+" "+(o.alt||"")+" "+o.k).includes(w));
+  let L = izEvren();
+  // favorilerdeki fonlar
+  for (const k of fav) if (k.startsWith("f:") && !L.find(x=>x.k===k)) { const o = fonOge(k.slice(2)); if (o) L.push(o); }
+  if (izGrup==="fav") L = [...fav].map(k => L.find(x=>x.k===k) || izBul(k)).filter(Boolean);
+  else if (izGrup==="fon") { L = q.length>=2 ? Object.keys(canli?.fon||{}).map(fonOge).filter(uy).slice(0,60) : L.filter(o=>o.grp==="fon"); }
+  else if (izGrup!=="tum") L = L.filter(o=>o.grp===izGrup);
+  if (q && izGrup!=="fon") { L = L.filter(uy); if (q.length>=2 && izGrup==="tum") L = L.concat(Object.keys(canli?.fon||{}).map(fonOge).filter(uy).slice(0,20)); }
+  if (!L.length) return `<p class="muted" style="padding:16px 4px">${izGrup==="fav"?"Henüz favori yok. Bir satırdaki ☆ işaretine dokunarak ekleyin.":izGrup==="fon"&&q.length<2?"Fon adını ya da kodunu yazın (ör. \"altın\", \"YJY\"); ☆ ile favorilere ekleyin.":"Sonuç yok."}</p>`;
+  return L.map(o => izSatir(o, fav.has(o.k))).join("");
+}
+function izListeYenile(){ const el = document.getElementById("izListe"); if (el) el.innerHTML = izListeHTML(); const s = document.getElementById("izSay"); if (s) s.textContent = izFavori().length+" favori"; }
+function izleme(){
+  kriptoAl();
+  return `<div class="iz-ust"><div><div style="font-size:22px;font-weight:700">İzleme listesi</div><div class="muted" id="izSay">${izFavori().length} favori</div></div></div>
+    <input id="izAra" class="iz-ara" placeholder="Ara (BTC, NVDA, altın, THYAO, fon kodu…)" value="${esc(izAra)}" autocomplete="off">
+    <div class="iz-cipler">${IZ_GRUP.map(([k,l])=>`<button data-izgrup="${k}" class="${izGrup===k?"on":""}">${l}</button>`).join("")}</div>
+    <div class="card iz-kart" id="izListe">${izListeHTML()}</div>
+    <p class="muted" style="font-size:11px">Kripto anlık (CoinGecko); hisse, endeks ve emtia ~15 dk gecikmeli, yarım saatte bir; fonlar günlük. Satıra dokununca grafik açılır.</p>`;
+}
+document.addEventListener("input", e => { if (e.target.id==="izAra"){ izAra = e.target.value; izListeYenile(); } });
+document.addEventListener("click", e => {
+  if (screen!=="app") return;
+  const y = e.target.closest("[data-yildiz]");
+  if (y){ e.stopPropagation(); e.preventDefault();
+    const k = y.dataset.yildiz, l = [...izFavori()], i = l.indexOf(k);
+    if (i>=0) l.splice(i,1); else l.push(k);
+    S.izleme = l; kaydet(true); izListeYenile(); return; }
+  const g = e.target.closest("[data-izgrup]");
+  if (g){ izGrup = g.dataset.izgrup; render(); return; }
+  const r = e.target.closest("[data-iz]");
+  if (r){ if (r.dataset.iz.startsWith("f:")) return toast("Fonlar için grafik henüz yok"); grafikAc(r.dataset.iz); }
+}, true);
+
 function kivilcim(seri, yon){
   if (!seri || seri.length < 3) return "";
   const mn = Math.min(...seri), mx = Math.max(...seri), rg = (mx-mn) || 1, W=160, H=48;
@@ -678,6 +797,11 @@ function anlikHesapla(){
 }
 const fTL4 = new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",minimumFractionDigits:2,maximumFractionDigits:4});
 const fN2 = new Intl.NumberFormat("tr-TR",{maximumFractionDigits:2});
+const fN4 = new Intl.NumberFormat("tr-TR",{minimumFractionDigits:4,maximumFractionDigits:4});
+const fUSD4 = new Intl.NumberFormat("tr-TR",{style:"currency",currency:"USD",minimumFractionDigits:4,maximumFractionDigits:4});
+const fUSD6 = new Intl.NumberFormat("tr-TR",{style:"currency",currency:"USD",maximumFractionDigits:6});
+const fTL2n = new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",minimumFractionDigits:2,maximumFractionDigits:2});
+const fN6tl = {format: v => new Intl.NumberFormat("tr-TR",{maximumFractionDigits:6}).format(v)+" TL"};
 const yuzde = (x,ond=2) => (x>0?"+":x<0?"−":"")+"%"+new Intl.NumberFormat("tr-TR",{minimumFractionDigits:ond,maximumFractionDigits:ond}).format(Math.abs(x));
 function fiyatSeridi(){
   btcSeriAl();
@@ -929,7 +1053,7 @@ function satir(a){
 
 function varliklar(){
   if (!S.assets.length) return `<div class="card"><p class="muted">Henüz varlık yok.</p><button class="btn" data-tab="ekle">Varlık ekle</button></div>`;
-  const ust = filtre ? `<div class="row" style="padding:0 0 8px"><b>${TYPES[filtre].ad}</b><button class="iconbtn" data-act="filtreYok">Tümünü göster</button></div>` : "";
+  const ust = filtre ? `<div class="row" style="padding:0 0 8px"><b>${TYPES[filtre].ad}</b><button class="iconbtn" data-act="filtreYok">Tümünü göster</button></div>` : `<div style="display:flex;justify-content:flex-end;margin-bottom:4px"><button class="iconbtn" data-tab="kasa">Özel Kasa ›</button></div>`;
   return ust + Object.keys(TYPES).filter(k=>k!=="alacak"&&k!=="borc"&&(!filtre||k===filtre)).map(k=>{
     const l = S.assets.filter(a=>a.type===k); if (!l.length) return "";
     const usdT = (k==="kripto"||k==="abd") ? l.reduce((x,a)=>x+(usdDeger(a)||0),0) : 0;
