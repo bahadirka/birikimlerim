@@ -142,12 +142,26 @@ def haber_ara(q, dil):
         if baslik: sonuc.append({"b": baslik, "k": kaynak, "u": bul("link").strip(), "z": zaman, "d": dil})
     return sonuc
 
+def trk(x): return x.replace("İ", "i").replace("I", "i").replace("ı", "i").lower()   # eşleştirme için i/ı farkı yok sayılır
+GENEL = {"türk", "türkiye", "anadolu", "global", "the", "inc", "holding", "grup", "yatırım", "enerji", "bank", "banka", "gayrimenkul"}
+TAKMA = {"THYAO": ["THY"], "TCELL": ["Turkcell"], "TTKOM": ["Türk Telekom"], "EREGL": ["Erdemir"], "KRDMD": ["Kardemir"], "TUPRS": ["Tüpraş"],
+         "ASELS": ["Aselsan"], "BIMAS": ["BİM"], "GOOGL": ["Google", "Alphabet"], "META": ["Meta", "Facebook"], "BRK-B": ["Berkshire"]}
+def alakali_mi(k, ad, b):
+    sinir = "A-Za-zÇĞİÖŞÜçğıöşü"
+    for kod in [k] + [x for x in TAKMA.get(k, []) if x.isupper()]:
+        if re.search(rf"(?<![{sinir}]){re.escape(kod)}(?![{sinir}])", b): return True
+    sade = re.sub(r"\s*\(.*?\)", "", ad).strip()
+    adlar = [sade] + [x for x in TAKMA.get(k, []) if not x.isupper()]
+    ilk = next((w for w in re.split(r"[\s.,/&-]+", sade) if len(w) >= 3), "")
+    if ilk and trk(ilk) not in GENEL: adlar.append(ilk)
+    return any(a and trk(a) in trk(b) for a in adlar)
+HABER_SURUM = 2   # süzgeç değişince artır: önbellek beklenmeden yenilenir
 def haberler():
     hedef = CIKTI / "haber"
     eski_t = (onceki.get("haberGuncel") or "")
     try: yas = (SIMDI - dt.datetime.fromisoformat(eski_t)).total_seconds() / 60
     except Exception: yas = 1e9
-    if yas < 50 and (ONCEKI / "haber").exists():
+    if yas < 50 and onceki.get("haberSurum") == HABER_SURUM and (ONCEKI / "haber").exists():
         shutil.copytree(ONCEKI / "haber", hedef, dirs_exist_ok=True); return eski_t
     say = 0
     for grup in ("bist", "abd"):
@@ -160,6 +174,9 @@ def haberler():
                     isim = re.sub(r"\s*\(.*?\)", "", ad).strip() or k
                     l = haber_ara(f'"{isim}" hisse', "tr")
                     if len(l) < 4: l += haber_ara(f'"{k}" stock', "en")
+                # alaka süzgeci: başlıkta kod (büyük harf, tam kelime) ya da şirket adının ilk kelimesi geçmeli
+                alakali = lambda b: alakali_mi(k, ad, b)
+                l = [h for h in l if alakali(h["b"])]
                 tek, gor = [], set()
                 for h in sorted(l, key=lambda x: -x["z"]):
                     anah = re.sub(r"\W+", "", h["b"].lower())[:60]
@@ -180,6 +197,6 @@ except Exception as e:
     hata.append(f"haber: {e}"); HABER_T = onceki.get("haberGuncel")
     if (ONCEKI / "haber").exists(): shutil.copytree(ONCEKI / "haber", CIKTI / "haber", dirs_exist_ok=True)
 
-d = oku(CIKTI / "analiz.json"); d["haberGuncel"] = HABER_T; d["hata"] = hata
+d = oku(CIKTI / "analiz.json"); d["haberGuncel"] = HABER_T; d["haberSurum"] = HABER_SURUM; d["hata"] = hata
 (CIKTI / "analiz.json").write_text(json.dumps(d, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 print("analiz:", {g: len(v) for g, v in HISSE.items()}, {g: len(v) for g, v in HEDEF.items()}, "tufe", len(TUFE), hata)

@@ -96,6 +96,29 @@ main a{color:var(--acc)}
 .pb-izgara span{display:block;font-size:11px}
 .rp-k{display:flex;align-items:center;gap:10px;margin:0;padding:10px 0;border-bottom:1px solid var(--line);font-size:15px;color:var(--fg);cursor:pointer}
 .rp-k input{width:20px;height:20px;margin:0;accent-color:var(--acc)}
+.ozet-kisa{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 12px}
+.ozet-kisa button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 4px;border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--fg);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.ozet-kisa button span{font-size:22px;line-height:1}
+.enf-hukum{margin-top:8px;font-size:15px}
+.dk-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.dk-chip{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;background:color-mix(in srgb,var(--muted) 14%,transparent);color:var(--fg)}
+.dk-chip.pos{background:color-mix(in srgb,var(--pos) 15%,transparent);color:var(--pos)}
+.dk-chip.neg{background:color-mix(in srgb,var(--neg) 14%,transparent);color:var(--neg)}
+.dk-chip.uyari{background:color-mix(in srgb,#f08c00 16%,transparent);color:#d9480f}
+.dk-chip.bilgi{background:color-mix(in srgb,#1c7ed6 15%,transparent);color:#1971c2}
+@media (prefers-color-scheme:dark){.dk-chip.uyari{color:#ffa94d}.dk-chip.bilgi{color:#74c0fc}}
+.dk-s{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.dk-s:last-of-type{border-bottom:0}
+.dk-aralik{position:relative;height:8px;border-radius:4px;margin:2px 0 0;background:linear-gradient(90deg,color-mix(in srgb,var(--neg) 55%,transparent),color-mix(in srgb,var(--muted) 30%,transparent),color-mix(in srgb,var(--pos) 55%,transparent))}
+.dk-isaret{position:absolute;top:-4px;width:4px;height:16px;margin-left:-2px;border-radius:2px;background:var(--fg)}
+.hb{display:block;padding:11px 0;border-bottom:1px solid var(--line);color:var(--fg);text-decoration:none}
+.hb:last-child{border-bottom:0}
+.hb-kod{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:6px;margin-right:6px;background:color-mix(in srgb,var(--acc) 16%,transparent);color:var(--acc);vertical-align:1px}
+.hb-b{font-size:15px;font-weight:600;line-height:1.35}
+.hb-alt{display:block;font-size:12px;margin-top:3px}
+.hb-filtre{display:flex;gap:6px;overflow-x:auto;padding:0 0 10px;scrollbar-width:none}
+.hb-filtre button{flex:none;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--fg);font:inherit;font-size:13px}
+.hb-filtre button.on{background:var(--acc);border-color:var(--acc);color:#fff}
 .sirala{display:flex;gap:6px;align-items:center;overflow-x:auto;scrollbar-width:none;margin:0 -16px 4px;padding:2px 16px 6px}
 .sirala::-webkit-scrollbar{display:none}
 .sirala span{flex:none;font-size:12px}
@@ -167,8 +190,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 50; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 51; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:51, t:"2026-11-07", n:["Haberler: sahip olduğunuz ve izlediğiniz hisselerin son haberleri (Özet → Haberler, ayrıca her hissenin detayında)","Enflasyona karşı: portföyünüz TÜFE, dolar, altın ve BIST 100 ile karşılaştırılır; reel getiri ve \"dolar alsaydım\" farkı","Durum kartları: trend, RSI, 52 haftalık aralık, analist hedefi ve yoğunlaşma uyarıları — bilgi amaçlı, tavsiye değil","Fon karşılaştırmasına TÜFE eklendi"]},
   {s:50, t:"2026-11-07", n:["Rapor: istediğiniz yatırım gruplarını seçip renkli, grafikli PDF özet oluşturun; WhatsApp veya e-postayla paylaşın","Seçenekler: kalem kalem liste, tutarları gizleme (yalnız yüzdeler), TL / USD / EUR","Özet sayfasının altında ve Ayarlar'da \"Rapor oluştur\" düğmesi"]},
   {s:49, t:"2026-11-07", n:["ABD hisse ve ETF'lerinde ortalama ve toplam maliyet her yerde dolar ($) olarak gösterilir"]},
   {s:48, t:"2026-11-07", n:["Dilim grafikte renge dokununca başka sayfaya gitmeden bilgisi açılır: kategori, toplam değer, portföy payı, kâr/zarar, dolar ve euro karşılığı","Alttaki satırlar eskisi gibi detay sayfasına götürür"]},
@@ -577,7 +601,7 @@ function render(){
   <header><h1>Birikimlerim${demo?' <span class="tag">DEMO</span>':''}</h1>
     <div><button class="iconbtn" data-act="gizle">${gizli?"Göster":"Gizle"}</button><button class="iconbtn" data-act="kilitle">Kilitle</button>${demo?"":`<button class="iconbtn ${tab==="ayarlar"?"on":""}" data-tab="ayarlar" aria-label="Ayarlar" style="font-size:16px">⚙︎</button>`}</div>
   </header>
-  <main>${tab==="ozet"?ozet():tab==="varlik"?varliklar():tab==="kasa"?kasa():tab==="izle"?izleme():tab==="rapor"?rapor():tab==="detay"?detay():tab==="sanal"?sanal():tab==="ba"?borcAlacak():tab==="ayarlar"?ayarlar():form()}</main>
+  <main>${tab==="ozet"?ozet():tab==="varlik"?varliklar():tab==="kasa"?kasa():tab==="izle"?izleme():tab==="rapor"?rapor():tab==="durum"?durumSayfa():tab==="haber"?haberSayfa():tab==="detay"?detay():tab==="sanal"?sanal():tab==="ba"?borcAlacak():tab==="ayarlar"?ayarlar():form()}</main>
   <nav>${[["ozet","Özet"],["varlik","Varlıklar"],["izle","İzleme"],["ba","Borç/Alacak"],["ekle",draft?.id?"Düzenle":"Ekle"]].map(([k,l])=>`<button data-tab="${k}" class="${tab===k?"on":""}">${l}</button>`).join("")}</nav>`;
 }
 
@@ -1155,7 +1179,7 @@ function iceAktarKontrol(){
 
 /* ============ Fon performans karşılaştırması ============ */
 const FP_DONEM = [["1H","1H"],["1A","1A"],["3A","3A"],["6A","6A"],["BY","Bu Yıl"],["1Y","1Y"],["5Y","5Y"]];
-const FP_KIYAS = [["XU100","XU100","BIST","#e03131"],["ALTIN","ALT/TL","ALT","#eda100"],["USD","USD/TL","USD","#2f9e44"],["EUR","EUR/TL","EUR","#2a78d6"]];
+const FP_KIYAS = [["TUFE","TÜFE","%","#868e96"],["XU100","XU100","BIST","#e03131"],["ALTIN","ALT/TL","ALT","#eda100"],["USD","USD/TL","USD","#2f9e44"],["EUR","EUR/TL","EUR","#2a78d6"]];
 let fonGetiri = null, fonGetiriSon = 0, fpDurum = null;
 async function fonGetiriAl(){
   if (fonGetiri && Date.now()-fonGetiriSon < 30*60000) return fonGetiri;
@@ -1164,7 +1188,7 @@ async function fonGetiriAl(){
 }
 async function fonPerfAc(kod, d="1H"){
   const kendi = S?.assets?.find(a=>(a.type==="fon"||a.type==="bes") && String(a.symbol).toUpperCase()===kod);
-  fpDurum = {kod, d, pb: kendi?.tutarCur==="USD" ? "USD" : "TRY"}; fonPerfCiz(); await fonGetiriAl(); if (fpDurum?.kod===kod) fonPerfCiz();
+  fpDurum = {kod, d, pb: kendi?.tutarCur==="USD" ? "USD" : "TRY"}; fonPerfCiz(); await Promise.all([fonGetiriAl(), analizAl()]); if (fpDurum?.kod===kod) fonPerfCiz();
 }
 /* Fonumun hangi para biriminde takip edildiği (döviz fonları birbiriyle) */
 const fonPB = kod => S?.assets?.find(a=>(a.type==="fon"||a.type==="bes") && String(a.symbol).toUpperCase()===kod)?.tutarCur || "TRY";
@@ -1177,7 +1201,7 @@ function fonPerfCiz(){
   let govde;
   if (!g) govde = `<div class="gp-bos" style="height:220px">Yükleniyor…</div>`;
   else {
-    const K = g.kiyas?.[P.d] || {}, U = K.USD, usd = P.pb==="USD";
+    const K = {...(g.kiyas?.[P.d] || {}), TUFE: analiz?.tufe ? tufeDonem(g.donem?.[P.d], g.ref||g.tarih) : null}, U = K.USD, usd = P.pb==="USD";
     const cev = v => usd ? usdBazli(v, U) : v;
     const kiyas = usd
       ? [["XU100","XU100 ($)","BIST","#e03131",cev(K.XU100)],["ALTIN","ALTIN ($)","ALT","#eda100",cev(K.ALTIN)],["EUR","EUR/USD","EUR","#2a78d6",cev(K.EUR)]]
@@ -1383,6 +1407,215 @@ document.addEventListener("click", async e => {
   if (t.dataset.act==="rpIndir" && RP.pdf){ const u = URL.createObjectURL(RP.pdf), l = document.createElement("a"); l.href = u; l.download = RP.pdf.name; l.target = "_blank"; l.click(); setTimeout(()=>URL.revokeObjectURL(u), 60000); }
 });
 
+/* ============ Analiz verisi: TÜFE, teknik göstergeler, analist hedefleri (fiyat botu üretir) ============ */
+let analiz = null, analizSon = 0, ekVeriIstek = false, ekVeriDeneme = 0;
+async function analizAl(){
+  if (analiz && Date.now()-analizSon < 30*60000) return analiz;
+  try { const r = await fetch(HAM+"analiz.json?t="+Math.floor(Date.now()/1800000)); if (r.ok){ analiz = await r.json(); analizSon = Date.now(); } } catch {}
+  return analiz;
+}
+function ekVeriYukle(){
+  if (ekVeriIstek || Date.now()-ekVeriDeneme < 60000) return; ekVeriIstek = true; ekVeriDeneme = Date.now();   // en fazla dakikada bir dene
+  Promise.all([analizAl(), fonGetiriAl()]).then(() => { ekVeriIstek = false; if (analiz && fonGetiri && ["ozet","durum","detay"].includes(tab)) render(); });
+}
+/* TÜFE: aylık % değişimlerden endeks kurulur; gün içindeki kısım ay oranıyla orantılanır.
+   Son açıklanan aydan sonrası, son aylık oranla tahmin edilir. */
+const ayKaydir = (ay, n) => { let [y, m] = ay.split("-").map(Number); m += n; while (m<=0){m+=12;y--;} while (m>12){m-=12;y++;} return `${y}-${String(m).padStart(2,"0")}`; };
+function tufeAt(t){
+  const s = analiz?.tufe; if (!s?.length) return null;
+  const E = {}; let I = 100; E[ayKaydir(s[0][0], -1)] = 100;
+  for (const [ay,,aylik] of s){ I *= 1 + aylik/100; E[ay] = I; }
+  const son = s[s.length-1][0], sonOran = s[s.length-1][2];
+  const d = new Date(t), ay = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`, onceki = ayKaydir(ay, -1);
+  if (onceki < ayKaydir(s[0][0], -1)) return null;
+  let taban = E[onceki], oran;
+  if (taban == null){ taban = E[son]; for (let a = son; a < onceki; a = ayKaydir(a, 1)) taban *= 1 + sonOran/100; oran = sonOran; }
+  else oran = E[ay] != null ? (E[ay]/taban - 1)*100 : sonOran;
+  const ayGun = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+  return taban * Math.pow(1 + oran/100, d.getDate()/ayGun);
+}
+function tufeDonem(bas, bit = Date.now()){ const a = tufeAt(bas), b = tufeAt(bit); return (a && b) ? (b/a - 1)*100 : null; }
+const tufeSonAy = () => { const s = analiz?.tufe; if (!s?.length) return null; const [y, m] = s[s.length-1][0].split("-"); return new Date(+y, +m-1, 1).toLocaleDateString("tr-TR",{month:"long",year:"numeric"}); };
+const reel = (nominal, enf) => (nominal==null || enf==null) ? null : ((1+nominal/100)/(1+enf/100) - 1)*100;
+
+/* Bir varlığın seçilen dönemdeki TL getirisi (bugünkü miktarla dönem başından tutulmuş sayılır) */
+const DONEMLER = [["1A","1 ay"],["3A","3 ay"],["6A","6 ay"],["BY","Yıl başı"],["1Y","1 yıl"]];
+function varlikDonemGetiri(a, d){
+  const K = fonGetiri?.kiyas?.[d] || {}, sy = String(a.symbol||"").toUpperCase(), H = analiz?.hisse;
+  switch (a.type){
+    case "bist": return H?.bist?.[sy]?.g?.[d] ?? null;
+    case "abd": { const g = H?.abd?.[sy]?.g?.[d]; return (g==null || K.USD==null) ? null : ((1+g/100)*(1+K.USD/100) - 1)*100; }
+    case "fon": case "bes": return fonGetiri?.fon?.[sy]?.[d] ?? null;
+    case "altin": return K.ALTIN ?? null;
+    case "gumus": return K.GUMUS ?? null;
+    case "kripto": return cgId(a.symbol)==="bitcoin" ? (K.BTC ?? null) : null;
+    case "nakit": { const c = a.cur||"TRY"; return c==="TRY" ? 0 : c==="USD" ? (K.USD ?? null) : c==="EUR" ? (K.EUR ?? null) : null; }
+    case "mevduat": {
+      const bas = fonGetiri?.donem?.[d], bit = fonGetiri?.ref; if (!bas || !bit) return null;
+      const m = mevduatHesap(a), gun = (new Date(bit) - new Date(bas))/GUN, r = m.oran*(1-m.stopaj/100)*gun/365;
+      const c = a.cur||"TRY", fx = c==="TRY" ? 0 : c==="USD" ? K.USD : c==="EUR" ? K.EUR : null;
+      return fx==null ? null : ((1+r/100)*(1+fx/100) - 1)*100;
+    }
+  }
+  return null;
+}
+function portfoyDonem(d){
+  let top = 0, kap = 0, agirlik = 0;
+  for (const a of S.assets){ if (isBA(a)) continue; const v = degerTL(a); if (!v) continue; top += v;
+    const g = varlikDonemGetiri(a, d); if (g==null) continue; kap += v; agirlik += v * g; }
+  return {g: kap ? agirlik/kap : null, kapsam: top ? kap/top : 0};
+}
+let enfDonem = (() => { try { return localStorage.getItem("enfDonem") || "1Y"; } catch { return "1Y"; } })();
+document.addEventListener("click", e => { const b = e.target.closest("[data-enf]"); if (!b) return; enfDonem = b.dataset.enf; try { localStorage.setItem("enfDonem", enfDonem); } catch {} render(); }, true);
+function cubukSatir(x, mx){
+  const v = x.v, gen = v==null ? 0 : Math.abs(v)/mx*50, cls = v==null ? "muted" : v>=0 ? "pos" : "neg";
+  return `<div class="fp-satir${x.ana?" ana":""}"><span class="mk-ik iz-ik" style="background:${x.r}">${esc(x.ik)}</span><b class="fp-ad">${esc(x.l)}</b>
+    <div class="fp-cubuk"><span class="fp-sifir"></span>${v==null?"":`<span class="fp-bar ${cls}" style="${v>=0?"left:50%":"right:50%"};width:${gen}%"></span>`}</div>
+    <b class="fp-y ${cls}">${v==null?"—":yuzde(v)}</b></div>`;
+}
+function enflasyonKart(){
+  if (!analiz?.tufe?.length || !fonGetiri?.kiyas){ ekVeriYukle(); return `<div class="card"><b>Enflasyona karşı</b><p class="muted">${ekVeriIstek?"Veriler yükleniyor…":"Enflasyon verisi henüz hazır değil; birazdan tekrar bakın."}</p></div>`; }
+  const d = enfDonem, K = fonGetiri.kiyas[d] || {}, bas = fonGetiri.donem?.[d], bit = fonGetiri.ref || fonGetiri.tarih;
+  const P = portfoyDonem(d), T = tufeDonem(bas, bit);
+  const satir = [
+    {l:"Portföyüm", ik:"₺", r:"var(--acc)", v:P.g, ana:true},
+    {l:"TÜFE", ik:"%", r:"#868e96", v:T},
+    {l:"Dolar", ik:"USD", r:"#2f9e44", v:K.USD},
+    {l:"Altın", ik:"ALT", r:"#eda100", v:K.ALTIN},
+    {l:"BIST 100", ik:"BIST", r:"#e03131", v:K.XU100},
+  ];
+  const mx = Math.max(1, ...satir.map(x=>Math.abs(x.v ?? 0)));
+  const r = reel(P.g, T), farkUSD = (P.g!=null && K.USD!=null) ? reel(P.g, K.USD) : null;
+  const hukum = P.g==null ? "" : `<div class="enf-hukum ${r>=0?"pos":"neg"}"><b>${r>=0?"Enflasyonun üstünde":"Enflasyonun altında"}</b> · reel getiri ${yuzde(r,1)}</div>
+    ${farkUSD!=null?`<div class="muted" style="margin-top:4px">Aynı parayla dönem başında dolar alsaydınız: ${farkUSD>=0?`portföyünüz dolardan <b class="pos">${yuzde(farkUSD,1)}</b> daha iyi`:`dolar <b class="neg">${yuzde(-farkUSD,1).replace("+","")}</b> daha iyi olurdu`}.</div>`:""}`;
+  const sonAy = tufeSonAy();
+  return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><b>Enflasyona karşı</b>
+    <div class="seg">${DONEMLER.map(([k,l])=>`<button data-enf="${k}" class="${d===k?"on":""}">${k==="BY"?"YB":k.replace("A","a").replace("Y","y")}</button>`).join("")}</div></div>
+    ${hukum}
+    <div style="margin-top:8px">${satir.map(x=>cubukSatir(x, mx)).join("")}</div>
+    <p class="muted" style="font-size:11px;margin:8px 0 0">${bas?`${new Date(bas).toLocaleDateString("tr-TR")} → ${new Date(bit).toLocaleDateString("tr-TR")}. `:""}Portföyüm: bugünkü dağılımınız dönem başından beri tutulmuş olsaydı TL getirisi (varlıklarınızın %${fN2.format(P.kapsam*100)}'i hesaba katıldı; verisi olmayanlar dışarıda). TÜFE, TCMB verisi${sonAy?` (son resmi veri: ${sonAy}; sonrası son aylık oranla tahmin)`:""}.</p></div>`;
+}
+
+/* ============ Durum kartı: nesnel göstergeler — tavsiye değildir ============ */
+function durumHesap(a){
+  const sy = String(a.symbol||"").toUpperCase(), H = analiz?.hisse?.[a.type]?.[sy], T = analiz?.hedef?.[a.type]?.[sy];
+  if (!H) return null;
+  const p = canli?.[a.type]?.[sy]?.p ?? H.son, s = {};
+  if (H.ma50){
+    if (H.ma200){
+      if (p > H.ma50 && H.ma50 > H.ma200) s.trend = {m:"Yükseliş trendi", c:"pos", a:"Fiyat 50 ve 200 günlük ortalamanın üstünde"};
+      else if (p < H.ma50 && H.ma50 < H.ma200) s.trend = {m:"Düşüş trendi", c:"neg", a:"Fiyat 50 ve 200 günlük ortalamanın altında"};
+      else s.trend = {m:"Karışık trend", c:"notr", a:`Fiyat 50 günlüğün ${p>H.ma50?"üstünde":"altında"}, 200 günlüğün ${p>H.ma200?"üstünde":"altında"}`};
+    } else s.trend = p > H.ma50 ? {m:"Kısa vade yukarı", c:"pos", a:"Fiyat 50 günlük ortalamanın üstünde"} : {m:"Kısa vade aşağı", c:"neg", a:"Fiyat 50 günlük ortalamanın altında"};
+  }
+  if (H.rsi!=null) s.rsi = H.rsi >= 70 ? {m:`RSI ${fN.format(H.rsi)} · aşırı alım`, c:"uyari", a:"Kısa sürede çok yükseldi; geri çekilme riski artar"}
+    : H.rsi <= 30 ? {m:`RSI ${fN.format(H.rsi)} · aşırı satım`, c:"bilgi", a:"Kısa sürede çok düştü; tepki gelebilir ama düşüş sürebilir de"}
+    : {m:`RSI ${fN.format(H.rsi)} · nötr`, c:"notr", a:"Ne aşırı alım ne aşırı satım bölgesinde"};
+  if (H.h52 && H.l52){ s.zirve = (p/H.h52 - 1)*100; s.konum = H.h52>H.l52 ? Math.min(1, Math.max(0, (p-H.l52)/(H.h52-H.l52))) : 0.5; s.h52 = H.h52; s.l52 = H.l52; }
+  if (T?.ort){ s.hedef = T; s.pot = (T.ort/p - 1)*100; }
+  s.p = p; s.g = H.g;
+  return s;
+}
+const dkChip = x => x ? `<span class="dk-chip ${x.c}" title="${esc(x.a||"")}">${esc(x.m)}</span>` : "";
+function durumKart(a){
+  if (!analiz){ ekVeriYukle(); return ""; }
+  const parcalar = [], kh = kzHesap(a), toplamV = netHesap().varlik || 0, v = degerTL(a);
+  const fx = a.type==="abd" ? fUSD2 : fTL2n;
+  const s = (a.type==="bist"||a.type==="abd") ? durumHesap(a) : null;
+  if (s){
+    parcalar.push(`<div class="dk-chips">${dkChip(s.trend)}${dkChip(s.rsi)}</div>`);
+    if (s.zirve!=null) parcalar.push(`<div class="dk-s"><span class="muted">52 haftalık aralık</span><b>${s.zirve>-0.5?"Zirvede":`Zirveden ${yuzde(s.zirve,1)}`}</b></div>
+      <div class="dk-aralik"><span class="dk-isaret" style="left:${(s.konum*100).toFixed(1)}%"></span></div>
+      <div class="dk-s muted" style="font-size:12px;padding-top:2px"><span>${fx.format(s.l52)}</span><span>${fx.format(s.h52)}</span></div>`);
+    if (s.hedef) parcalar.push(`<div class="dk-s"><span class="muted">Analist hedef ortalaması (${s.hedef.n} analist)</span><b>${fx.format(s.hedef.ort)} <span class="${s.pot>=0?"pos":"neg"}">(${yuzde(s.pot,1)})</span></b></div>
+      ${s.hedef.oneri?`<div class="dk-s"><span class="muted">Analist görüş ortalaması</span><b>${esc(s.hedef.oneri)}</b></div>`:""}`);
+    if (s.g) parcalar.push(`<div class="dk-s"><span class="muted">Getiri 1a · 3a · 1y</span><b>${["1A","3A","1Y"].map(k=>s.g[k]==null?"—":`<span class="${s.g[k]>=0?"pos":"neg"}">${yuzde(s.g[k],1)}</span>`).join(" · ")}</b></div>`);
+  }
+  if ((a.type==="fon"||a.type==="bes") && fonGetiri?.fon){
+    const sy = String(a.symbol||"").toUpperCase(), F = fonGetiri.fon[sy];
+    if (F) parcalar.push(["3A","1Y"].map(d=>{ const t = tufeDonem(fonGetiri.donem?.[d], fonGetiri.ref), r = reel(F[d], t);
+      return F[d]==null ? "" : `<div class="dk-s"><span class="muted">${d==="3A"?"Son 3 ay":"Son 1 yıl"}: fon ${yuzde(F[d],1)} · TÜFE ${t==null?"—":yuzde(t,1)}</span><b class="${r>=0?"pos":"neg"}">${r==null?"—":(r>=0?"TÜFE'nin ":"TÜFE'nin ")+yuzde(Math.abs(r),1).replace("+","")+(r>=0?" üstünde":" altında")}</b></div>`; }).join(""));
+  }
+  if (a.date && kh && kh.pb==="TRY"){
+    const t = tufeDonem(a.date), r = reel(kh.oran, t);
+    if (r!=null) parcalar.push(`<div class="dk-s"><span class="muted">Alıştan bu yana TÜFE ${yuzde(t,1)} · reel getiriniz</span><b class="${r>=0?"pos":"neg"}">${yuzde(r,1)}</b></div>`);
+  }
+  if (v && toplamV){ const pay = v/toplamV*100; parcalar.push(`<div class="dk-s"><span class="muted">Portföydeki payı</span><b class="${pay>=20?"neg":""}">%${fN2.format(pay)}${pay>=20?" · yoğun":""}</b></div>`); }
+  if (!parcalar.length) return "";
+  return `<h2>Durum kartı</h2><div class="card">${parcalar.join("")}<p class="muted" style="font-size:11px;margin:8px 0 0">Göstergeler geçmiş fiyatlardan hesaplanır; analist verileri Yahoo Finance'ten. Bilgi amaçlıdır, al-sat tavsiyesi değildir.</p></div>`;
+}
+/* Portföy geneli uyarılar + tüm hisselerin durum özeti */
+function yogunlukUyarilari(){
+  const u = [], top = S.assets.filter(a=>!isBA(a)).reduce((x,a)=>x+(degerTL(a)||0),0); if (!top) return u;
+  const sym = {};
+  for (const a of S.assets){ if (!["bist","abd","kripto","fon","bes"].includes(a.type)) continue; const k = a.type+":"+String(a.symbol||"").toUpperCase(); sym[k] = (sym[k]||0) + (degerTL(a)||0); }
+  for (const [k, v] of Object.entries(sym)) if (v/top >= 0.2) u.push({c:"neg", m:`${k.split(":")[1]} tek başına portföyün %${fN2.format(v/top*100)}'i`, a:"Tek bir varlıkta yüksek yoğunluk riski artırır."});
+  const tip = {}; for (const a of S.assets){ if (isBA(a)) continue; tip[a.type] = (tip[a.type]||0) + (degerTL(a)||0); }
+  for (const [k, v] of Object.entries(tip)) if (v/top >= 0.5) u.push({c:"uyari", m:`${TYPES[k].ad} portföyün %${fN2.format(v/top*100)}'i`, a:"Tek varlık sınıfı ağırlığı yüksek."});
+  const tl = S.assets.filter(a=>a.type==="nakit" && (a.cur||"TRY")==="TRY").reduce((x,a)=>x+(degerTL(a)||0),0);
+  if (tl/top >= 0.15){ const t1 = analiz?.tufe?.length ? analiz.tufe[analiz.tufe.length-1][1] : null;
+    u.push({c:"uyari", m:`TL nakit portföyün %${fN2.format(tl/top*100)}'i`, a:`Faizsiz TL, enflasyon kadar değer kaybeder${t1?` (yıllık TÜFE %${fN2.format(t1)})`:""}.`}); }
+  return u;
+}
+function durumSayfa(){
+  if (!analiz){ ekVeriYukle(); }
+  const u = yogunlukUyarilari();
+  const bas = `<div class="row" style="padding:0 0 6px"><button class="iconbtn" data-tab="ozet" style="margin:0">‹ Özet</button><b>Durum kartları</b></div>`;
+  const uyari = `<div class="card"><b>Portföy geneli</b>${u.length ? u.map(x=>`<div class="dk-s" style="align-items:flex-start"><span><span class="dk-chip ${x.c}">${esc(x.m)}</span><div class="muted" style="font-size:12px;margin-top:4px">${esc(x.a)}</div></span></div>`).join("") : `<p class="pos" style="margin:6px 0 0">✓ Belirgin bir yoğunlaşma yok.</p>`}</div>`;
+  if (!analiz) return bas + uyari + `<div class="card"><p class="muted">Göstergeler yükleniyor…</p></div>`;
+  const blok = tip => {
+    const tek = new Map(); for (const a of S.assets.filter(a=>a.type===tip && a.symbol)){ const k = String(a.symbol).toUpperCase(); if (!tek.has(k)) tek.set(k, a); }
+    const satir = [...tek.entries()].map(([k, a]) => ({k, a, s: durumHesap(a), v: S.assets.filter(x=>x.type===tip && String(x.symbol).toUpperCase()===k).reduce((x,y)=>x+(degerTL(y)||0),0)})).sort((x,y)=>y.v-x.v);
+    if (!satir.length) return "";
+    return `<h2>${TYPES[tip].ad}</h2><div class="card">${satir.map(({k,a,s})=>`<div class="row tap" data-detay="${esc(a.id)}" style="align-items:flex-start;gap:10px">
+      <span style="flex:1;min-width:0"><b>${esc(k)}</b>${s?`<div class="dk-chips" style="margin-top:5px">${dkChip(s.trend)}${dkChip(s.rsi)}${s.zirve!=null?dkChip({m:s.zirve>-0.5?"52h zirvede":`Zirveden ${yuzde(s.zirve,0)}`, c:"notr"}):""}${s.pot!=null?dkChip({m:`Hedef ${yuzde(s.pot,0)}`, c:s.pot>=0?"pos":"neg", a:`${s.hedef.n} analistin ortalama hedefi`}):""}</div>`:`<div class="muted" style="font-size:12px">Gösterge verisi yok</div>`}</span><span class="muted">›</span></div>`).join("")}</div>`;
+  };
+  return bas + uyari + blok("bist") + blok("abd") + `<p class="muted" style="font-size:11px">Trend: 50 ve 200 günlük ortalamalar · RSI: 14 günlük göreli güç · Hedef: analistlerin ortalama hedef fiyatına uzaklık (Yahoo Finance). Bilgi amaçlıdır, al-sat tavsiyesi değildir.</p>`;
+}
+
+/* ============ Haberler: sahip olunan + izleme listesindeki hisseler (Google Haberler) ============ */
+const haberOnbellek = {}; let haberFiltre = "hepsi", haberDurum = null;
+function haberKodlari(){
+  const m = new Map();
+  for (const a of S.assets) if ((a.type==="bist"||a.type==="abd") && a.symbol) m.set(a.type+":"+String(a.symbol).toUpperCase(), "var");
+  for (const k of izFavori()){ const g = k.startsWith("b:") ? "bist" : k.startsWith("a:") ? "abd" : null; if (g && !m.has(g+":"+k.slice(2))) m.set(g+":"+k.slice(2), "iz"); }
+  return m;
+}
+async function haberAl(anahtar){
+  const o = haberOnbellek[anahtar]; if (o && Date.now()-o.t < 20*60000) return o.d;
+  const [g, k] = anahtar.split(":");
+  try { const r = await fetch(`${HAM}haber/${g}/${encodeURIComponent(k)}.json?t=${Math.floor(Date.now()/1200000)}`); const d = r.ok ? await r.json() : []; haberOnbellek[anahtar] = {t:Date.now(), d}; return d; }
+  catch { const d = o?.d || []; haberOnbellek[anahtar] = {t:Date.now(), d}; return d; }
+}
+async function haberleriYukle(){
+  const kod = [...haberKodlari().keys()]; haberDurum = "yukleniyor";
+  await Promise.all(kod.map(haberAl)); haberDurum = "hazir"; if (tab==="haber" || tab==="detay") render();
+}
+const ne_zaman = z => { if (!z) return ""; const s = (Date.now()/1000 - z)/60; return s<60 ? `${Math.max(1,Math.round(s))} dk önce` : s<1440 ? `${Math.round(s/60)} saat önce` : s<2880 ? "dün" : `${Math.round(s/1440)} gün önce`; };
+const haberSatir = (h, k) => `<a class="hb" href="${esc(h.u)}" target="_blank" rel="noopener noreferrer">${k?`<span class="hb-kod">${esc(k)}</span>`:""}<span class="hb-b">${esc(h.b)}</span><span class="muted hb-alt">${esc(h.k||"")}${h.k?" · ":""}${ne_zaman(h.z)}${h.d==="en"?" · EN":""}</span></a>`;
+function haberSayfa(){
+  const kodlar = haberKodlari();
+  if (haberDurum!=="yukleniyor" && [...kodlar.keys()].some(k=>!haberOnbellek[k] || Date.now()-haberOnbellek[k].t > 20*60000)) haberleriYukle();
+  const bas = `<div class="row" style="padding:0 0 6px"><button class="iconbtn" data-tab="ozet" style="margin:0">‹ Özet</button><b>Haberler</b></div>`;
+  if (!kodlar.size) return bas + `<div class="card"><p class="muted">Hisse senedi varlığınız ya da izleme listenizde hisse yok.</p></div>`;
+  const tum = [];
+  for (const [k, tur] of kodlar){ for (const h of haberOnbellek[k]?.d || []) tum.push({...h, kod:k.split(":")[1], tur}); }
+  const gor = new Set(), liste = tum.sort((x,y)=>y.z-x.z).filter(h => { const a = h.u; if (gor.has(a)) return false; gor.add(a); return true; })
+    .filter(h => haberFiltre==="hepsi" ? true : haberFiltre==="var" ? h.tur==="var" : haberFiltre==="iz" ? h.tur==="iz" : h.kod===haberFiltre);
+  const chips = [["hepsi","Tümü"],["var","Varlıklarım"],...([...kodlar.values()].includes("iz")?[["iz","İzleme listem"]]:[]),
+    ...[...kodlar.entries()].filter(([,t])=>t==="var").map(([k])=>[k.split(":")[1], k.split(":")[1]])];
+  return bas + `<div class="hb-filtre">${chips.map(([k,l])=>`<button data-hbf="${esc(k)}" class="${haberFiltre===k?"on":""}">${esc(l)}</button>`).join("")}</div>
+    <div class="card" style="padding:4px 14px">${haberDurum==="yukleniyor" && !tum.length ? `<p class="muted">Yükleniyor…</p>` : liste.length ? liste.slice(0,80).map(h=>haberSatir(h, h.kod)).join("") : `<p class="muted">Son 30 günde haber bulunamadı.</p>`}</div>
+    <p class="muted" style="font-size:11px">Kaynak: Google Haberler, son 30 gün; saatte bir yenilenir. Haberler açılınca ilgili sitede okunur.</p>`;
+}
+document.addEventListener("click", e => { const b = e.target.closest("[data-hbf]"); if (!b) return; haberFiltre = b.dataset.hbf; render(); window.scrollTo(0,0); }, true);
+function detayHaber(a){
+  if (!(a.type==="bist"||a.type==="abd") || !a.symbol) return "";
+  const k = a.type+":"+String(a.symbol).toUpperCase(), o = haberOnbellek[k];
+  if (!o){ haberAl(k).then(()=>{ if (tab==="detay") render(); }); return `<h2>Haberler</h2><div class="card"><p class="muted">Yükleniyor…</p></div>`; }
+  return `<h2>Haberler</h2><div class="card" style="padding:4px 14px">${o.d.length ? o.d.slice(0,5).map(h=>haberSatir(h)).join("") : `<p class="muted">Son 30 günde haber yok.</p>`}</div>`;
+}
+
 function kivilcim(seri, yon){
   if (!seri || seri.length < 3) return "";
   const mn = Math.min(...seri), mx = Math.max(...seri), rg = (mx-mn) || 1, W=160, H=48;
@@ -1458,8 +1691,9 @@ function ozet(){
     ${t.eksik?`<p class="muted">${t.eksik} varlığın fiyatı yok, toplama katılmadı.</p>`:""}
   </div>
   ${sira.length?`<div class="card">${pasta(grup, top)}</div>`:`<div class="card"><p class="muted">Henüz varlık yok. "Ekle"den başlayın.</p></div>`}
+  <div class="ozet-kisa"><button data-tab="haber"><span>📰</span>Haberler</button><button data-tab="durum"><span>🧭</span>Durum kartları</button><button data-tab="rapor"><span>📄</span>PDF rapor</button></div>
+  ${S.assets.some(a=>!isBA(a)) ? enflasyonKart() : ""}
   <div class="card"><div class="muted" style="margin-bottom:6px">Portföy değeri</div>${grafik()}</div>
-  <button class="btn ghost" data-tab="rapor">📄 Rapor oluştur · PDF paylaş</button>
   <h2>Piyasa</h2>${fiyatSeridi()}`;
 }
 
@@ -1779,8 +2013,10 @@ function detay(){
     ${kh?`<div class="${kh.oran>=0?"pos":"neg"}" style="font-weight:600">${yuzde(kh.oran,2)} ${kh.oran>=0?"kâr":"zarar"}${kh.etiket?` <span class="muted" style="font-weight:400">(${kh.etiket})</span>`:""}</div>`:""}
   </div>
   <div class="card">${satirlar.join("")}</div>
+  ${durumKart(a)}
   ${gk?`<button class="btn ghost" data-act="detayGrafik" data-k="${esc(gk)}">Grafik ve Piyasa Nabzı</button>`:""}
   ${(a.type==="fon"||a.type==="bes")&&a.symbol?`<button class="btn ghost" data-act="detayPerf" data-k="${esc(String(a.symbol).toUpperCase())}">Performansı karşılaştır</button>`:""}
+  ${detayHaber(a)}
   <button class="btn" data-edit="${esc(a.id)}">Düzenle</button>
   <button class="btn danger" data-act="detaySil">Sil</button>`;
 }
