@@ -77,7 +77,19 @@ main a{color:var(--acc)}
 .mk{cursor:pointer}
 .gp{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center}
 @media (min-width:600px){.gp{align-items:center}}
-.gp-kart{background:var(--card);width:100%;max-width:480px;border-radius:18px 18px 0 0;padding:14px 16px calc(16px + env(safe-area-inset-bottom))}
+.gp-kart{background:var(--card);width:100%;max-width:480px;border-radius:18px 18px 0 0;padding:14px 16px calc(16px + env(safe-area-inset-bottom));max-height:92vh;overflow-y:auto;overscroll-behavior:contain}
+.nb{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
+.nb-bas{font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.nb-puan{text-align:center;font-size:28px;font-weight:800;letter-spacing:-.5px;margin-top:-2px}
+.nb-puan small{display:block;font-size:9px;letter-spacing:1.5px;color:var(--muted);font-weight:600}
+.nb-evre{border-left:3px solid;padding:6px 0 6px 12px;margin-top:6px;font-size:14px}
+.nb-ad{font-size:22px;font-weight:800;margin:2px 0}
+.nb-k{font-size:10px;letter-spacing:.6px;text-transform:uppercase}
+.nb-izgara{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px;font-size:14px}
+.nb-cubuk{display:flex;gap:4px;margin-top:12px;overflow-x:auto;scrollbar-width:none}
+.nb-cubuk span{flex:1 0 auto;font-size:10px;text-align:center;padding:5px 6px;border-radius:8px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.nb-cubuk span::before{content:"";display:block;width:5px;height:5px;border-radius:50%;background:var(--r);margin:0 auto 3px}
+.nb-cubuk span.on{border-color:var(--r);color:var(--fg);font-weight:700}
 @media (min-width:600px){.gp-kart{border-radius:18px}}
 .gp-ust{display:flex;align-items:center;gap:8px}
 .gp-fiyat{font-size:26px;font-weight:700;margin-top:10px;letter-spacing:-.4px}
@@ -124,8 +136,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 31; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 32; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:32, t:"2026-11-07", n:["Piyasa Nabzı: grafik penceresinin altında 0–100 puanlı gösterge, durum (Aşırı korku … Aşırı coşku), trend, 200/50 günlük ortalama, RSI ve yıllık zirveye uzaklık","Tüm hisseler, endeksler, kripto, döviz ve emtia için 1 yıllık fiyat geçmişinden hesaplanır"]},
   {s:31, t:"2026-11-07", n:["Favori listesinde sıralama: satıra basılı tutup yukarı/aşağı sürükleyin","Fenerbahçe (FENER), Galatasaray (GSRAY), Beşiktaş (BJKAS) ve Trabzonspor (TSPOR) hisseleri eklendi"]},
   {s:30, t:"2026-11-07", n:["İzleme listesi sekmesi: kripto, hisseler (BIST/ABD), endeksler, döviz, emtia (ons altın/gümüş, Brent) ve fonlar","☆ ile favori listenizi oluşturun (şifreli kasada saklanır, eşinizle ortak)","Arama ve kategori düğmeleri; satıra dokununca grafik (Gün/Hafta/Ay/Yıl)","Özel Kasa artık Varlıklar sayfasının sağ üstünde"]},
   {s:29, t:"2026-11-07", n:["Özet'te seçilen para birimi (TL / USD / EUR) tüm uygulamada geçerli: varlık listeleri, kategori toplamları, dilim grafik, kasa, borç/alacak ve vadeli mevduat detayları"]},
@@ -597,7 +610,7 @@ async function grafikVeri(k, r){
   if (k==="btc" || k.startsWith("c:")){
     const gun = {gun:1, hafta:7, ay:30, yil:365}[r], id = k==="btc" ? "bitcoin" : k.slice(2);
     try { const j = await (await fetch(`https://api.coingecko.com/api/v3/coins/${encodeURIComponent(id)}/market_chart?vs_currency=usd&days=${gun}`)).json();
-      let p = j.prices||[]; const adim = Math.ceil(p.length/200); p = p.filter((_,i)=>i%adim===0||i===p.length-1);
+      let p = j.prices||[]; const adim = Math.ceil(p.length/400); p = p.filter((_,i)=>i%adim===0||i===p.length-1);
       return {t:p.map(x=>x[0]/1000), v:p.map(x=>x[1])}; } catch { return null; }
   }
   let g = canli?.grafik?.[GRAFIK_ANAHTAR[k] || k];
@@ -609,12 +622,86 @@ async function grafikVeri(k, r){
   if (["gram24","ceyrek","gumus"].includes(k) && guncel) { const o = guncel / d.v[d.v.length-1]; d = {t:d.t, v:d.v.map(x=>x*o)}; }
   return d;
 }
+/* ============ Piyasa Nabzı: 1 yıllık günlük kapanışlardan teknik özet ============
+   Puan (0–100) = ortalama( RSI-14, 52 haftalık aralıktaki konum, 50 ve 200 günlük ortalamaya uzaklık ).
+   Yatırım tavsiyesi değildir; yalnızca fiyatın kendi geçmişine göre nerede durduğunu özetler. */
+const nabizOnbellek = {};
+const NABIZ_EVRE = [
+  [0,15,"Aşırı korku","Fiyat bir yılın en zayıf bölgesinde; satış baskısı çok yoğun.","#c92a2a"],
+  [15,30,"Panik satış","Fiyat ortalamaların belirgin şekilde altında; düşüş sert.","#e8590c"],
+  [30,45,"Kararsızlık","Destekler zorlanıyor; yön henüz netleşmedi.","#e0b84a"],
+  [45,55,"Denge","Fiyat ortalamaların çevresinde; alıcı ve satıcı dengede.","#adb5bd"],
+  [55,70,"Toparlanma","Fiyat ortalamaların üstüne çıkıyor; ivme olumlu.","#2f9e44"],
+  [70,85,"İyimserlik","Güçlü yükseliş; fiyat yıllık aralığın üst bölgesinde.","#1c7ed6"],
+  [85,101,"Aşırı coşku","Fiyat bir yılın zirvesine yakın ve ortalamalardan çok uzak.","#7048e8"],
+];
+const ort = (v, n) => v.length>=n ? v.slice(-n).reduce((a,b)=>a+b,0)/n : null;
+function rsi14(v){
+  if (v.length < 16) return null;
+  let k=0, z=0; for (let i=v.length-14;i<v.length;i++){ const d=v[i]-v[i-1]; if (d>0) k+=d; else z-=d; }
+  return z===0 ? 100 : 100 - 100/(1+k/z);
+}
+const sig = (x, olcek) => 100/(1+Math.exp(-x/olcek)); // uzaklığı 0–100'e çevirir
+function nabizHesapla(v, guncel){
+  if (!v || v.length < 60) return null;
+  v = v.slice(); if (guncel && isFinite(guncel)) v.push(guncel);
+  const p = v[v.length-1], m50 = ort(v,50), m200 = ort(v, Math.min(200, v.length-1)), r = rsi14(v);
+  const yuk = Math.max(...v.slice(-252)), dus = Math.min(...v.slice(-252));
+  const aralik = yuk>dus ? (p-dus)/(yuk-dus)*100 : 50;
+  const u50 = m50 ? (p/m50-1)*100 : 0, u200 = m200 ? (p/m200-1)*100 : 0;
+  const parca = [r ?? 50, aralik, sig(u50, 4), sig(u200, 8)];
+  const puan = Math.max(0, Math.min(100, parca.reduce((a,b)=>a+b,0)/parca.length));
+  const evre = NABIZ_EVRE.find(e => puan>=e[0] && puan<e[1]);
+  const trend = (p>m50 && m50>m200) ? ["Yükseliş","yukari"] : (p<m50 && p<m200) ? ["Daralma","asagi"] : ["Kararsız","yatay"];
+  return {puan, evre, trend, p, m50, m200, r, yuk, dus, aralik, u50, u200, zirve:(p/yuk-1)*100, gun:v.length, kisa: v.length<200};
+}
+function nabizGosterge(puan){
+  const R=70, C=90, Y=86, a = Math.PI*(1-puan/100);
+  const yay = (b,e,renk) => { const a0=Math.PI*(1-b/100), a1=Math.PI*(1-e/100);
+    return `<path d="M${C+R*Math.cos(a0)},${Y-R*Math.sin(a0)} A${R},${R} 0 0 1 ${C+R*Math.cos(a1)},${Y-R*Math.sin(a1)}" stroke="${renk}" stroke-width="10" fill="none" opacity=".85"/>`; };
+  const segs = NABIZ_EVRE.map(e=>yay(e[0]+0.8, Math.min(e[1],100)-0.8, e[4])).join("");
+  return `<svg viewBox="0 0 180 104" style="width:200px;max-width:100%;display:block;margin:0 auto" aria-hidden="true">${segs}
+    <line x1="${C}" y1="${Y}" x2="${C+(R-14)*Math.cos(a)}" y2="${Y-(R-14)*Math.sin(a)}" stroke="var(--fg)" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="${C}" cy="${Y}" r="4" fill="var(--fg)"/></svg>`;
+}
+function nabizHTML(n, f){
+  if (!n) return `<div class="nb"><div class="nb-bas">Piyasa Nabzı</div><p class="muted" style="margin:6px 0 0">Hesaplanıyor…</p></div>`;
+  if (n==="yok") return `<div class="nb"><div class="nb-bas">Piyasa Nabzı</div><p class="muted" style="margin:6px 0 0">Bu enstrüman için yeterli geçmiş veri yok.</p></div>`;
+  const [ , , ad, , renk] = n.evre, F = x => x==null ? "—" : f.format(x);
+  const anlam = (n.p>n.m50 && n.p>n.m200 ? "Fiyat hem 50 hem 200 günlük ortalamanın üstünde."
+    : n.p<n.m50 && n.p<n.m200 ? "Fiyat hem 50 hem 200 günlük ortalamanın altında."
+    : n.p>n.m50 ? "Kısa vadede toparlanma var; fiyat hâlâ 200 günlük ortalamanın altında."
+    : "Uzun vadeli eğilim yukarı; kısa vadede geri çekilme var.")
+    + (n.r!=null && n.r>=70 ? " RSI aşırı alım bölgesinde." : n.r!=null && n.r<=30 ? " RSI aşırı satım bölgesinde." : "");
+  const ok = {yukari:"↗", asagi:"↘", yatay:"→"}[n.trend[1]];
+  const ust = (x) => x>=0 ? "üstünde" : "altında";
+  const metin = `Fiyat (${F(n.p)}) 200 günlük ortalamanın (${F(n.m200)}) %${fN2.format(Math.abs(n.u200))} ${ust(n.u200)}, 50 günlük ortalamanın (${F(n.m50)}) %${fN2.format(Math.abs(n.u50))} ${ust(n.u50)}. Son bir yılın zirvesinin (${F(n.yuk)}) %${fN2.format(Math.abs(n.zirve))} ${n.zirve>=-0.05?"yakınında":"altında"}; yıllık aralığın %${fN2.format(n.aralik)} seviyesinde. RSI-14: ${n.r==null?"—":fN2.format(n.r)}.`;
+  return `<div class="nb">
+    <div class="nb-bas">Piyasa Nabzı</div>
+    <div style="position:relative">${nabizGosterge(n.puan)}<div class="nb-puan">${fN2.format(n.puan)}<small>PUAN</small></div></div>
+    <div class="nb-evre" style="border-color:${renk}"><div class="muted nb-k">Durum</div><div class="nb-ad" style="color:${renk}">${ad}</div><div>${anlam}</div></div>
+    <div class="nb-izgara">
+      <div><div class="muted nb-k">Trend</div><b class="${n.trend[1]==="yukari"?"pos":n.trend[1]==="asagi"?"neg":""}">${ok} ${n.trend[0]}</b></div>
+      <div><div class="muted nb-k">1 yıllık zirve</div><b>${F(n.yuk)}</b></div>
+      <div><div class="muted nb-k">200G ort.</div><b>${F(n.m200)}</b></div>
+      <div><div class="muted nb-k">RSI-14</div><b>${n.r==null?"—":fN2.format(n.r)}</b></div>
+    </div>
+    <p style="font-size:13px;margin:10px 0 0">${metin}</p>
+    <div class="nb-cubuk">${NABIZ_EVRE.map(e=>`<span class="${e===n.evre?"on":""}" style="--r:${e[4]}">${e[2]}</span>`).join("")}</div>
+    <p class="muted" style="font-size:11px;margin:8px 0 0">${n.kisa?"200 günden kısa geçmiş: uzun ortalama mevcut verinin tamamından hesaplandı. ":""}Bu gösterge yalnızca fiyatın son bir yıldaki kendi geçmişine göre konumunu özetler; yatırım tavsiyesi değildir.</p>
+  </div>`;
+}
 async function grafikAc(k, r="gun"){
   const d0 = izBul(k); if (!d0) return;
   grafikDurum = {k, r, t:[], v:[], yukleniyor:true}; grafikCiz();
   const d = await grafikVeri(k, r);
   if (!grafikDurum || grafikDurum.k!==k || grafikDurum.r!==r) return;
-  grafikDurum = {k, r, ...(d||{t:[],v:[]}), yukleniyor:false}; grafikCiz();
+  grafikDurum = {k, r, ...(d||{t:[],v:[]}), yukleniyor:false, nabiz: nabizOnbellek[k]}; grafikCiz();
+  if (!nabizOnbellek[k]) {
+    const y = r==="yil" ? d : await grafikVeri(k, "yil");
+    nabizOnbellek[k] = nabizHesapla(y?.v, izBul(k)?.v) || "yok";
+    if (grafikDurum && grafikDurum.k===k){ grafikDurum.nabiz = nabizOnbellek[k]; grafikCiz(); }
+  }
 }
 function grafikKapat(){ grafikDurum=null; document.getElementById("grafikPencere")?.remove(); }
 function grafikCiz(){
@@ -654,6 +741,7 @@ function grafikCiz(){
     <div class="seg" style="display:flex;margin-top:10px">${ARALIK.map(([k,l])=>`<button style="flex:1" data-gp="${k}" class="${G.r===k?"on":""}">${l}</button>`).join("")}</div>
     ${["gram24","ceyrek","gumus"].includes(G.k)?'<p class="muted" style="font-size:11px;margin:8px 0 0">Eğri dünya ons fiyatı × dolar kurundan çizilir; seviye bugünkü fiyata göre ayarlanır.</p>':""}
     ${["XU100","XU030","GSPC","IXIC","USD","EUR"].includes(G.k)?'<p class="muted" style="font-size:11px;margin:8px 0 0">Veri yaklaşık 15 dk gecikmeli; yarım saatte bir güncellenir.</p>':""}
+    ${nabizHTML(G.nabiz, f)}
   </div>`;
   const alan = document.getElementById("gpAlan");
   if (alan){
