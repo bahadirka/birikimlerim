@@ -20,9 +20,12 @@ def liste(dosya):
     return sorted(kodlar)
 
 # ---------- Hisseler (Yahoo, ~15 dk gecikmeli) ----------
+# Borsadaki kod ile Yahoo kodu farklı olanlar (ör. Darphane altın sertifikası)
+YAHOO = {"ALTIN": "ALTINS1"}
+GERI = {v: k for k, v in YAHOO.items()}
 def hisseler(semboller, ek, hedef):
     import yfinance as yf
-    tick = [s + ek for s in semboller]
+    tick = [YAHOO.get(s, s) + ek for s in semboller]
     for i in range(0, len(tick), 80):
         parca = tick[i:i+80]
         try:
@@ -35,7 +38,7 @@ def hisseler(semboller, ek, hedef):
                 c = (df[t] if len(parca) > 1 else df)["Close"].dropna()
                 if c.empty: continue
                 p = float(c.iloc[-1]); onceki = float(c.iloc[-2]) if len(c) > 1 else None
-                hedef[t[:-len(ek)] if ek else t] = {
+                hedef[GERI.get(t[:-len(ek)] if ek else t, t[:-len(ek)] if ek else t)] = {
                     "p": round(p, 4),
                     "ch": round((p / onceki - 1) * 100, 2) if onceki else None,
                     "t": str(c.index[-1].date())}
@@ -215,7 +218,7 @@ def hisse_grafik(klasor):
     for grup, ek in (("bist", ".IS"), ("abd", "")):
         kodlar = sorted(out[grup].keys())
         if not kodlar: continue
-        tick = [k + ek for k in kodlar]
+        tick = [YAHOO.get(k, k) + ek for k in kodlar]
         try:
             y = yf.download(tick, period="1y", interval="1d", group_by="ticker", progress=False, threads=True, auto_adjust=False)
             h = yf.download(tick, period="5d", interval="30m", group_by="ticker", progress=False, threads=True, auto_adjust=False)
