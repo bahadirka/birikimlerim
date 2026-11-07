@@ -123,3 +123,11 @@ FENER | Fenerbahçe Futbol
 GSRAY | Galatasaray Sportif
 BJKAS | Beşiktaş Futbol Yatırımları
 TSPOR | Trabzonspor Sportif
+AGROT | Agrotech Yüksek Teknoloji
+AHGAZ | Ahlatcı Doğal Gaz
+CVKMD | CVK Maden
+GIPTA | Gıpta Ofis Kırtasiye
+KZGYO | Kuzugrup GYO
+SDTTR | SDT Uzay ve Savunma
+DMRGD | DMR Unlu Mamuller
+HATSN | Hat-San Gemi İnşaa
