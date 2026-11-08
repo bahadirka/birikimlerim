@@ -197,8 +197,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 57; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 58; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:58, t:"2026-11-08", n:["Özet'te USD/EUR seçiliyken kâr/zarar tutarları da hep o para biriminde","KZBGY adı düzeltildi: Kızılbük GYO"]},
   {s:57, t:"2026-11-08", n:["BES: aynı kişinin birden çok sözleşmesi kişi altında toplanır; sözleşme no ve plan görünür"]},
   {s:56, t:"2026-11-08", n:["BES hesabı: kişi kişi toplam birikim, ödenen katkı, devlet katkısı ve fon dağılımı (ekran görüntüsünden yüklenir)","BES fon kodları TEFAS'ta bulunursa değer, ekran gününden bugüne fon fiyatlarıyla tahmini güncellenir","7 günden eski BES ekranı için Özet'te hatırlatma"]},
   {s:55, t:"2026-11-08", n:["Kripto: NEAR, ONDO, XTZ, ENJ, EOS, ETHW, NEO ve daha fazla coin için canlı fiyat","İçe aktarma bağlantısı kripto borsası (BtcTurk vb.) kayıtlarını destekler"]},
@@ -542,6 +543,9 @@ function kzHesap(a){
   if (deger==null){ const d = degerTL(a), k = kurTL(pb); if (d==null || !k) return null; deger = d/k; }
   return {pb, oran:(deger/maliyet-1)*100, tutar:deger-maliyet};
 }
+/* Kâr/zarar tutarı: Özet'te USD/EUR seçiliyse hep o para biriminde; TL seçiliyken dolar bazlı varlıklar (ABD, kripto) dolar kalır */
+const khPara = kh => { const v = Math.abs(kh.tutar); if (kh.tl || kh.pb==="TRY") return para(v);
+  if (gosterPB!=="TRY" && kh.pb!==gosterPB){ const k = kurTL(kh.pb); if (k) return para(v*k); } return pbFmt(kh.pb).format(v); };
 const pbFmt = pb => pb==="USD" ? fUSD : pb==="EUR" ? fEUR : fTLn;
 function toplam(list){ let v=0, eksik=0, mal=0, malDeger=0; for (const a of list){ if (isBA(a)) continue; const d=degerTL(a); if (d==null) { eksik++; continue; } v+=d; const c=maliyetTL(a); if (c!=null){ mal+=c; malDeger+=d; } } return {v, eksik, kz: mal ? malDeger-mal : null, kzOran: mal ? (malDeger-mal)/mal*100 : null}; }
 
@@ -2040,7 +2044,7 @@ function satir(a){
   return `<div class="row tap" data-detay="${esc(a.id)}">
     <div><div>${esc(etiket(a))}${a.konum==="kasa"?'<span class="tag">kasa</span>':""}</div>
     <div class="muted">${miktar(a)}${cf?` · <span class="pos">canlı</span> ${a.type==="abd"?"$"+fN.format(cf.p):fN.format(cf.p)+" TL"}${cf.ch!=null?` <span class="${cf.ch>=0?"pos":"neg"}">${cf.ch>=0?"+":""}${cf.ch}%</span>`:""}${a.type==="fon"||a.type==="bes"?" · "+esc(cf.t||""):""}`:""}${elle?` · elle fiyat${a.fiyatCur&&a.fiyatCur!=="TRY"?" ("+a.fiyatCur+")":""}${a.priceDate?" · "+esc(a.priceDate):""}`:""}${a.konum==="borsa"&&a.borsaAd?" · "+esc(a.borsaAd):""}${a.konumNot?" · "+esc(a.konumNot):""}</div></div>
-    <div class="r"><div>${para(d)}</div>${usdKarsilik(a, d)}${(()=>{ if (!(a.tutarCur&&a.tutarCur!=="TRY"&&d!=null)) return ""; const k = (cf && tcmbKur(cf.t, a.tutarCur)) || kurTL(a.tutarCur); return k ? `<div class="muted">≈ ${para(d/k, a.tutarCur==="USD"?fUSD:fEUR)}</div>` : ""; })()}${kz!=null?(false?``:`<div class="${kz>=0?"pos":"neg"}" style="font-size:13px">${gizli?"":yuzde(kz,2)+(kz>=0?" kâr":" zarar")}</div><div class="${kz>=0?"pos":"neg"}" style="font-size:12px">${gizli?"••••":(kh.tutar>=0?"+":"−")+(kh.tl?para(Math.abs(kh.tutar)):pbFmt(kh.pb).format(Math.abs(kh.tutar)))}</div>${kh.etiket?`<div class="muted" style="font-size:11px">${kh.etiket}</div>`:""}`):""}</div>
+    <div class="r"><div>${para(d)}</div>${usdKarsilik(a, d)}${(()=>{ if (!(a.tutarCur&&a.tutarCur!=="TRY"&&d!=null)) return ""; const k = (cf && tcmbKur(cf.t, a.tutarCur)) || kurTL(a.tutarCur); return k ? `<div class="muted">≈ ${para(d/k, a.tutarCur==="USD"?fUSD:fEUR)}</div>` : ""; })()}${kz!=null?(false?``:`<div class="${kz>=0?"pos":"neg"}" style="font-size:13px">${gizli?"":yuzde(kz,2)+(kz>=0?" kâr":" zarar")}</div><div class="${kz>=0?"pos":"neg"}" style="font-size:12px">${gizli?"••••":(kh.tutar>=0?"+":"−")+khPara(kh)}</div>${kh.etiket?`<div class="muted" style="font-size:11px">${kh.etiket}</div>`:""}`):""}</div>
   </div>`;
 }
 
@@ -2100,7 +2104,7 @@ function kurumSatir(a){
   return `<div class="row tap" data-detay="${esc(a.id)}">
     <div><b>${esc(a.konumNot || (a.konum==="borsa"&&a.borsaAd) || KONUM[a.konum] || "—")}</b>
       <div class="muted" style="font-size:12px">${gizli?"••••":fN.format(q)} ${birim}${ortMaliyetMetni(a,q)?` · ort. ${ortMaliyetMetni(a,q)}`:""}</div></div>
-    <div class="r"><div>${para(d)}</div>${kh?`<div class="${kh.oran>=0?"pos":"neg"}" style="font-size:12px">${gizli?"":yuzde(kh.oran,2)} · ${gizli?"••••":(kh.tutar>=0?"+":"−")+(kh.tl?para(Math.abs(kh.tutar)):pbFmt(kh.pb).format(Math.abs(kh.tutar)))}</div>`:`<div class="muted" style="font-size:11px">maliyet yok</div>`}</div>
+    <div class="r"><div>${para(d)}</div>${kh?`<div class="${kh.oran>=0?"pos":"neg"}" style="font-size:12px">${gizli?"":yuzde(kh.oran,2)} · ${gizli?"••••":(kh.tutar>=0?"+":"−")+khPara(kh)}</div>`:`<div class="muted" style="font-size:11px">maliyet yok</div>`}</div>
     <span class="muted" style="margin-left:6px">›</span></div>`;
 }
 /* Okuma amaçlı detay sayfası (düzenleme bir dokunuş ötede) */
@@ -2133,9 +2137,9 @@ function detay(){
     else if (a.type==="kripto" && prices.crypto[cgId(a.symbol)]?.ch!=null) { const c = prices.crypto[cgId(a.symbol)].ch; ek("24 saatlik değişim", yuzde(c), c>=0?"pos":"neg"); }
     ek("Ortalama maliyet", ortMaliyetMetni(a,q) || "girilmemiş", mt==null?"muted":"");
     ek("Toplam maliyet", mt==null ? null : a.type==="abd" && maliyetUSD(a)!=null ? para(maliyetUSD(a), fUSD2) : para(mt));
-    if (kh){ const tutar = kh.tl ? para(Math.abs(kh.tutar)) : pbFmt(kh.pb).format(Math.abs(kh.tutar));
+    if (kh){ const tutar = khPara(kh);
       ek("Kâr / zarar", `${kh.tutar>=0?"+":"−"}${tutar} (${yuzde(kh.oran,2)})`, kh.oran>=0?"pos":"neg");
-      if (mt!=null && d!=null && kU && kh.pb!=="USD"){ const usdKz = d/kU - mt/kU; ek("Kâr / zarar (USD, bugünkü kurla)", `${usdKz>=0?"+":"−"}${fUSD2.format(Math.abs(usdKz))}`, usdKz>=0?"pos":"neg"); } }
+      if (mt!=null && d!=null && kU && kh.pb!=="USD" && gosterPB!=="USD"){ const usdKz = d/kU - mt/kU; ek("Kâr / zarar (USD, bugünkü kurla)", `${usdKz>=0?"+":"−"}${fUSD2.format(Math.abs(usdKz))}`, usdKz>=0?"pos":"neg"); } }
     if (u!=null) ek("Dolar karşılığı", fUSD2.format(u));
     ek("Alış tarihi", a.date ? esc(a.date) : null);
   }
@@ -2283,7 +2287,7 @@ function form(){
     <label>Alış maliyeti (isteğe bağlı — kâr/zarar hesabı için)</label>
     <div class="seg" style="display:flex;margin-bottom:6px">${[["toplam","Toplam ödediğim"],["birim",["fon","bes"].includes(a.type)?"Pay başı fiyat":"Adet/gram başı fiyat"]].map(([k,l])=>`<label style="flex:1;margin:0;text-align:center;padding:6px 4px;font-size:12px;cursor:pointer" class="${(a.costTip||"toplam")===k?"segon":""}"><input type="radio" name="costTip" value="${k}" ${(a.costTip||"toplam")===k?"checked":""} style="display:none">${l}</label>`).join("")}</div>
     <div style="display:flex;gap:8px"><input name="cost" inputmode="decimal" value="${v("cost")}" style="flex:2" placeholder="${(a.costTip||"toplam")==="birim"?"ör. 52,40":"ör. 250000"}"><select style="flex:1" name="costCur">${["TRY","USD","EUR"].map(c=>`<option value="${c}" ${(a.costCur||"TRY")===c?"selected":""}>${c==="TRY"?"TL":c}</option>`).join("")}</select></div>
-    ${(()=>{ const kh = a.id ? kzHesap(a) : null; return kh ? `<p class="${kh.oran>=0?"pos":"neg"}" style="font-size:13px;margin:6px 0 0">Bu maliyetle: ${yuzde(kh.oran,2)} ${kh.oran>=0?"kâr":"zarar"} (${(kh.tutar>=0?"+":"−")+pbFmt(kh.pb).format(Math.abs(kh.tutar))}). Rakam yanlışsa \"Toplam ödediğim\" ile \"birim fiyat\" seçimini kontrol edin.</p>` : ""; })()}
+    ${(()=>{ const kh = a.id ? kzHesap(a) : null; return kh ? `<p class="${kh.oran>=0?"pos":"neg"}" style="font-size:13px;margin:6px 0 0">Bu maliyetle: ${yuzde(kh.oran,2)} ${kh.oran>=0?"kâr":"zarar"} (${(kh.tutar>=0?"+":"−")+khPara(kh)}). Rakam yanlışsa \"Toplam ödediğim\" ile \"birim fiyat\" seçimini kontrol edin.</p>` : ""; })()}
     <label>Alış tarihi</label><input name="date" type="date" value="${v("date")}">`}
     <button class="btn" type="submit">${a.id?"Kaydet":"Ekle"}</button>
     ${a.id?`<button class="btn danger" type="button" data-act="sil">Sil</button><button class="btn ghost" type="button" data-act="vazgec">Vazgeç</button>`:""}

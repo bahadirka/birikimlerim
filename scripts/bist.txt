@@ -141,7 +141,7 @@ HDFGS | Hedef Girişim
 IHLAS | İhlas Holding
 IZENR | İzdemir Enerji
 KUTPO | Kütahya Porselen
-KZBGY | Kuzey Boru (Kuzeyboru)
+KZBGY | Kızılbük Gayrimenkul Yatırım Ortaklığı
 LRSHO | Loras Holding
 TARKM | Tarkim Bitki Koruma
 TRCAS | Turcas Petrol
