@@ -197,8 +197,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 60; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 61; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:61, t:"2026-11-08", n:["Ana ekranda Gizle açıksa PDF rapor tutarsız üretilir: yalnız yüzdeler, dağılım ve kâr/zarar oranları"]},
   {s:60, t:"2026-11-08", n:["Kripto kayıtlarında \"Kripto borsası\" yerine borsanın adı (Binance, BtcTurk) görünür; PDF raporda da","Aynı coin birden çok borsadaysa tek satırda: dolar bazında ortalama maliyet ve kâr/zarar","Binance'taki coinler için canlı fiyat (TWT, DASH, CHZ, THETA, AXS, RVN, FLR…)"]},
   {s:59, t:"2026-11-08", n:["İçe aktarma bağlantısı altın ve gümüş alımlarını (tarih ve maliyetle) destekler"]},
   {s:58, t:"2026-11-08", n:["Özet'te USD/EUR seçiliyken kâr/zarar tutarları da hep o para biriminde","KZBGY adı düzeltildi: Kızılbük GYO"]},
@@ -1289,7 +1290,12 @@ document.addEventListener("click", e => {
 /* ============ Rapor (PDF) — telefonda üretilir, paylaş menüsüyle gönderilir ============ */
 const RP = { sec: null, detay: true, gizliTutar: false, pb: null, pdf: null, uretiliyor: false };
 function rpGruplar(){ return Object.keys(TYPES).filter(k => S.assets.some(a=>a.type===k)); }
+function rpGizliEsitle(){   // ana ekranda "Gizle" açıksa rapor da tutarsız üretilir
+  if (gizli){ if (!RP.gizliTutar) RP.pdf = null; RP.gizliTutar = true; RP.zorla = true; }
+  else if (RP.zorla){ RP.gizliTutar = false; RP.zorla = false; RP.pdf = null; }
+}
 function rapor(){
+  rpGizliEsitle();
   const gr = rpGruplar();
   if (!RP.sec) RP.sec = new Set(gr.filter(k=>!isBA({type:k})));
   if (!RP.pb) RP.pb = gosterPB;
@@ -1302,7 +1308,7 @@ function rapor(){
   </div>
   <div class="card"><div style="font-weight:700;margin-bottom:6px">Seçenekler</div>
     <label class="rp-k"><input type="checkbox" data-rpopt="detay" ${RP.detay?"checked":""}><span style="flex:1">Kalem kalem liste (her hisse, fon, coin…)</span></label>
-    <label class="rp-k"><input type="checkbox" data-rpopt="gizliTutar" ${RP.gizliTutar?"checked":""}><span style="flex:1">Tutarları gizle (yalnız yüzdeler ve dağılım)</span></label>
+    <label class="rp-k"><input type="checkbox" data-rpopt="gizliTutar" ${RP.gizliTutar?"checked":""} ${gizli?"disabled":""}><span style="flex:1">Tutarları gizle (yalnız yüzdeler ve dağılım)${gizli?`<br><span class="muted" style="font-size:12px">Ana ekranda "Gizle" açık olduğu için rapor tutarsız üretilir</span>`:""}</span></label>
     <div class="row" style="border:0;padding:8px 0 0"><span>Para birimi</span><div class="seg">${["TRY","USD","EUR"].map(k=>`<button data-rppb="${k}" class="${RP.pb===k?"on":""}">${PB[k].ad}</button>`).join("")}</div></div>
   </div>
   <button class="btn" data-act="rpOlustur" ${RP.uretiliyor?"disabled":""}>${RP.uretiliyor?"PDF hazırlanıyor…":"PDF oluştur"}</button>
@@ -1412,7 +1418,7 @@ function rpCiz(){
       y += H2;
     }
     if (RP.detay){ g.fillStyle = "#fff"; g.fillRect(RPM, y, RPW-2*RPM, 50); g.fillStyle = CIZ; g.fillRect(RPM+20, y+49, RPW-2*RPM-40, 2);
-      yazi("Varlık  ·  kurum  ·  miktar", RPM+30, y+34, 21, 600, GRI); yazi("Değer", DEGX, y+34, 21, 600, GRI, "right"); yazi("Kâr / zarar", SAG, y+34, 21, 600, GRI, "right"); y += 50; } };
+      yazi(RP.gizliTutar ? "Varlık  ·  kurum" : "Varlık  ·  kurum  ·  miktar", RPM+30, y+34, 21, 600, GRI); yazi(RP.gizliTutar ? "Grup içi pay" : "Değer", DEGX, y+34, 21, 600, GRI, "right"); yazi("Kâr / zarar", SAG, y+34, 21, 600, GRI, "right"); y += 50; } };
   const kapat = () => { g.save(); g.beginPath(); g.roundRect(RPM, y, RPW-2*RPM, 22, [0,0,26,26]); g.fillStyle = "#fff"; g.fill(); g.restore(); y += 22 + 30; };
   const varlikTop = tum.reduce((x,a)=>x+(degerTL(a)||0),0) || 1;
   for (const k of grSira){
@@ -1431,11 +1437,12 @@ function rpCiz(){
         g.fillStyle = TYPES[k].renk; g.fillRect(RPM, y, 6, RH);
         // sol: ad (1. satır), kurum · miktar (2. satır)
         yazi(etiket(a), RPM+30, y+38, 26, 700, "#1d1d1f", "left", SOLW);
-        const alt = a.hesap ? [a.sirket||"", a.sozNo||"", (a.fonlar||[]).length ? `${a.fonlar.length} fon` : "", a.tarih ? "ekran "+new Date(a.tarih).toLocaleDateString("tr-TR") : ""].filter(Boolean).join("  ·  ") : [kurumAd(a), a.type==="mevduat" ? (a.vade ? "vade "+new Date(a.vade).toLocaleDateString("tr-TR") : "") : `${fN.format(+a.qty||0)} ${birimAd(a)}`].filter(Boolean).join("  ·  ");
+        const alt = a.hesap ? [a.sirket||"", a.sozNo||"", (a.fonlar||[]).length ? `${a.fonlar.length} fon` : "", a.tarih ? "ekran "+new Date(a.tarih).toLocaleDateString("tr-TR") : ""].filter(Boolean).join("  ·  ") : [kurumAd(a), a.type==="mevduat" ? (a.vade ? "vade "+new Date(a.vade).toLocaleDateString("tr-TR") : "") : (RP.gizliTutar ? "" : `${fN.format(+a.qty||0)} ${birimAd(a)}`)].filter(Boolean).join("  ·  ");
         yazi(alt, RPM+30, y+70, 22, 400, GRI, "left", SOLW);
         // orta: değer + grup içi payı
-        yazi(rpPara(d, pb), DEGX, y+38, 26, 700, "#1d1d1f", "right", 280);
-        if (d && tt.v) yazi(`%${fN2.format(d/tt.v*100)}`, DEGX, y+70, 21, 400, GRI, "right");
+        if (RP.gizliTutar) yazi(d && tt.v ? `%${fN2.format(d/tt.v*100)}` : "—", DEGX, y+38, 26, 700, "#1d1d1f", "right");
+        else { yazi(rpPara(d, pb), DEGX, y+38, 26, 700, "#1d1d1f", "right", 280);
+          if (d && tt.v) yazi(`%${fN2.format(d/tt.v*100)}`, DEGX, y+70, 21, 400, GRI, "right"); }
         // sağ: yüzde rozeti + tutar
         if (kh){ const txt = yuzde(kh.oran,1); font(24,700); const w = g.measureText(txt).width + 28;
           kutu(SAG-w, y+12, w, 38, 19, kh.oran>=0 ? "#e6f4ea" : "#fde8e8"); yazi(txt, SAG-14, y+40, 24, 700, kzR(kh.oran), "right");
@@ -1454,6 +1461,7 @@ function rpCiz(){
   return sayfalar;
 }
 async function rpOlustur(){
+  rpGizliEsitle();
   if (!RP.sec.size) return toast("En az bir grup seçin");
   RP.uretiliyor = true; RP.pdf = null; render();
   try {
