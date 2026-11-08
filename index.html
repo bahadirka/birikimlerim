@@ -126,6 +126,11 @@ main a{color:var(--acc)}
 .bes-cubuk{height:6px;border-radius:3px;background:color-mix(in srgb,var(--muted) 15%,transparent);margin:6px 0 4px;overflow:hidden}
 .bes-cubuk span{display:block;height:100%;border-radius:3px}
 .bes-fon-alt{display:flex;justify-content:space-between;font-size:12px}
+.kb-izgara{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:0 0 8px}
+.kb-kart{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;cursor:pointer}
+.kb-kart.on{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
+.kb-ad{font-weight:700;font-size:15px}
+.kb-deger{font-size:18px;font-weight:700;margin-top:4px}
 .sirala{display:flex;gap:6px;align-items:center;overflow-x:auto;scrollbar-width:none;margin:0 -16px 4px;padding:2px 16px 6px}
 .sirala::-webkit-scrollbar{display:none}
 .sirala span{flex:none;font-size:12px}
@@ -197,8 +202,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 63; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 64; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:64, t:"2026-11-09", n:["Kripto: borsa kartları (Binance, BtcTurk…) — her borsanın portföy büyüklüğü (TL ve $) ve kâr/zararı; dokununca liste yalnız o borsayı gösterir","Endeks fiyatı gelmezse son kapanıştan gösterilir (Merval)"]},
   {s:63, t:"2026-11-09", n:["Borç/Alacak: \"✓ Ödendi\" ile kapatma (Kapananlar listesi, geri alınabilir); kapananlar toplamlara ve rapora girmez","Özet'te açık alacak hatırlatması (pazartesileri ve vadesi geçenlerde)"]},
   {s:62, t:"2026-11-09", n:["İzleme → Endeksler: Avrupa (DAX, FTSE 100, CAC 40, Euro Stoxx 50, FTSE MIB, IBEX 35), Uzakdoğu (Nikkei, Hang Seng, Şanghay, KOSPI, TAIEX), Hindistan (Nifty 50, Sensex), Güney/Latin Amerika (Bovespa, Merval, IPC) — grafik ve Piyasa Nabzı dahil"]},
   {s:61, t:"2026-11-08", n:["Ana ekranda Gizle açıksa PDF rapor tutarsız üretilir: yalnız yüzdeler, dağılım ve kâr/zarar oranları"]},
@@ -928,7 +934,10 @@ function izEvren(){
   // endeksler
   for (const k of ["XU100","XU030","GSPC","IXIC"]) if (piy[k]) ekle({...piy[k], alt:k.startsWith("XU")?"Borsa İstanbul":"ABD", grp:"endeks"});
   if (e["^DJI"]) ekle({k:"DJI", l:"Dow Jones", alt:"ABD", grp:"endeks", ik:"DJ", ir:"#364fc7", v:e["^DJI"].p, ch:e["^DJI"].ch, f:fN2});
-  for (const [k, t, l, alt, ik, ir] of DUNYA_ENDEKS) if (e[t]) ekle({k, l, alt, grp:"endeks", ik, ir, v:e[t].p, ch:e[t].ch, f:fN2});
+  for (const [k, t, l, alt, ik, ir] of DUNYA_ENDEKS){
+    let v = e[t]?.p, ch = e[t]?.ch; const y = canli?.grafik?.[k]?.yil?.v;   // fiyat gelmezse yıllık grafiğin son kapanışı
+    if (v==null && y?.length>1){ v = y[y.length-1]; ch = (y[y.length-1]/y[y.length-2]-1)*100; }
+    if (v!=null) ekle({k, l, alt, grp:"endeks", ik, ir, v, ch, f:fN2}); }
   // hisseler
   const ad = canli?.adlar || {};
   for (const [kod, x] of Object.entries(canli?.bist||{})) ekle({k:"b:"+kod, l:kod, alt:(ad.bist?.[kod]||"")+" · BIST", grp:"hisse", ik:kod.slice(0,3), ir:"#e03131", v:x.p, ch:x.ch, f:fTL2n});
@@ -2212,6 +2221,27 @@ document.addEventListener("click", e => {
   siralama = b.dataset.sirala; try { localStorage.setItem("siralama", siralama); } catch {} render();
 }, true);
 let malAcik = false;
+/* Kripto: borsa (Binance, BtcTurk…) bazında portföy büyüklüğü ve kâr/zarar; bir borsa seçilince liste yalnız onu gösterir */
+let kriptoBorsaSec = (() => { try { return localStorage.getItem("kriptoBorsa") || ""; } catch { return ""; } })();
+document.addEventListener("click", e => { const b = e.target.closest("[data-kborsa]"); if (!b) return; e.stopPropagation();
+  kriptoBorsaSec = kriptoBorsaSec===b.dataset.kborsa ? "" : b.dataset.kborsa; try { localStorage.setItem("kriptoBorsa", kriptoBorsaSec); } catch {} render(); }, true);
+function kriptoBorsaHesap(l){
+  let v = 0, vU = 0, mU = 0, dU = 0, n = 0;
+  for (const a of l){ const d = degerTL(a), u = usdDeger(a), m = maliyetUSD(a); n++;
+    if (d!=null) v += d; if (u!=null) vU += u; if (m!=null && u!=null){ mU += m; dU += u; } }
+  return {v, vU, mU, kzU: mU ? dU - mU : null, oranU: mU ? (dU/mU - 1)*100 : null, n};
+}
+function kriptoBorsaOzet(l){
+  const borsalar = [...new Set(l.map(a=>kurumAd(a)||"Diğer"))]; if (borsalar.length < 2 && !kriptoBorsaSec) return "";
+  const satirlar = borsalar.map(b => ({b, h: kriptoBorsaHesap(l.filter(a=>(kurumAd(a)||"Diğer")===b))})).sort((x,y)=>y.h.v-x.h.v);
+  const hepsi = kriptoBorsaHesap(l);
+  const kz = h => h.kzU==null ? `<span class="muted">maliyet yok</span>` : `<span class="${h.kzU>=0?"pos":"neg"}">${gizli?"":yuzde(h.oranU,2)+" · "}${gizli?"••••":(h.kzU>=0?"+":"−")+fUSD.format(Math.abs(h.kzU))}</span>`;
+  const kart = (b, h, sec) => `<div class="kb-kart${sec?" on":""}" data-kborsa="${esc(b)}"><div class="kb-ad">${esc(b)} <span class="muted">· ${h.n} coin</span></div>
+    <div class="kb-deger">${para(h.v)}</div><div class="muted" style="font-size:12px">${gizli?"••••":fUSD.format(h.vU)}</div><div style="font-size:13px;font-weight:600;margin-top:2px">${kz(h)}</div></div>`;
+  return `<div class="kb-izgara">${satirlar.map(x=>kart(x.b, x.h, kriptoBorsaSec===x.b)).join("")}</div>
+    ${kriptoBorsaSec ? `<div class="row" style="padding:2px 2px 8px;border:0"><span class="muted">Yalnız <b>${esc(kriptoBorsaSec)}</b> gösteriliyor</span><button class="iconbtn" data-kborsa="${esc(kriptoBorsaSec)}" style="margin:0">Tüm borsalar</button></div>`
+      : `<div class="muted" style="font-size:12px;padding:0 2px 8px">Toplam kâr/zarar: ${kz(hepsi)} · Bir borsaya dokunun, yalnız onun coinleri listelensin.</div>`}`;
+}
 function varliklar(){
   if (!S.assets.length) return `<div class="card"><p class="muted">Henüz varlık yok.</p><button class="btn" data-tab="ekle">Varlık ekle</button></div>`;
   const ust = filtre ? `<div class="row" style="padding:0 0 8px"><b>${TYPES[filtre].ad}</b><button class="iconbtn" data-act="filtreYok">Tümünü göster</button></div>` : `<div style="display:flex;justify-content:flex-end;margin-bottom:4px"><button class="iconbtn" data-tab="kasa">Özel Kasa ›</button></div>`;
@@ -2224,6 +2254,8 @@ function varliklar(){
   return ust + sir + Object.keys(TYPES).filter(k=>k!=="alacak"&&k!=="borc"&&(!filtre||k===filtre)).map(k=>{
     const l = S.assets.filter(a=>a.type===k); if (!l.length) return "";
     const usdT = (k==="kripto"||k==="abd") ? l.reduce((x,a)=>x+(usdDeger(a)||0),0) : 0;
+    if (k==="kripto"){ const ks = kriptoBorsaSec && l.some(a=>kurumAd(a)===kriptoBorsaSec) ? l.filter(a=>kurumAd(a)===kriptoBorsaSec) : l;
+      return `<h2>${TYPES[k].ad} · ${para(toplam(l).v)}${usdT?` · ${para(usdT, fUSD)}`:""}</h2>${kriptoBorsaOzet(l)}<div class="card">${siraliListe(grupla(ks)).map(gSatir).join("")}</div>`; }
     return `<h2>${TYPES[k].ad} · ${para(toplam(l).v)}${usdT?` · ${para(usdT, fUSD)}`:""}</h2><div class="card">${siraliListe(grupla(l)).map(gSatir).join("")}</div>${k==="bist"?bistOzet(l):""}`;
   }).join("");
 }
