@@ -46,18 +46,22 @@ def hisseler(semboller, ek, hedef):
                 pass
         time.sleep(1)
 
+# Dünya endeksleri (izleme listesi): uygulamadaki anahtar → Yahoo kodu
+DUNYA = {"DAX": "^GDAXI", "FTSE": "^FTSE", "CAC": "^FCHI", "SX5E": "^STOXX50E", "MIB": "FTSEMIB.MI", "IBEX": "^IBEX",
+         "N225": "^N225", "HSI": "^HSI", "SSE": "000001.SS", "KOSPI": "^KS11", "TWII": "^TWII",
+         "NIFTY": "^NSEI", "SENSEX": "^BSESN", "BVSP": "^BVSP", "MERV": "^MERV", "MXX": "^MXX"}
 try:
     hisseler(liste("bist.txt"), ".IS", out["bist"])
     hisseler(liste("abd.txt"), "", out["abd"])
     out["endeks"] = {}
-    hisseler(["XU100.IS", "XU030.IS", "^GSPC", "^IXIC", "^DJI"], "", out["endeks"])
+    hisseler(["XU100.IS", "XU030.IS", "^GSPC", "^IXIC", "^DJI"] + list(DUNYA.values()), "", out["endeks"])
 except Exception as e:
     out["hata"].append(f"hisse: {e}")
 
 # ---------- Gün içi mini grafik serileri (15 dk) ----------
 SERI = {"XU100": "XU100.IS", "XU030": "XU030.IS", "GSPC": "^GSPC", "IXIC": "^IXIC",
         "USD": "USDTRY=X", "EUR": "EURTRY=X", "ONS": "GC=F", "AGONS": "SI=F", "BTCUSD": "BTC-USD",
-        "DJI": "^DJI", "GBP": "GBPTRY=X", "EURUSD": "EURUSD=X", "BRENT": "BZ=F"}
+        "DJI": "^DJI", "GBP": "GBPTRY=X", "EURUSD": "EURUSD=X", "BRENT": "BZ=F", **DUNYA}
 def seriler():
     import yfinance as yf
     out["seri"] = {}

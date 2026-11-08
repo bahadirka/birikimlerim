@@ -197,8 +197,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 61; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 62; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:62, t:"2026-11-09", n:["İzleme → Endeksler: Avrupa (DAX, FTSE 100, CAC 40, Euro Stoxx 50, FTSE MIB, IBEX 35), Uzakdoğu (Nikkei, Hang Seng, Şanghay, KOSPI, TAIEX), Hindistan (Nifty 50, Sensex), Güney/Latin Amerika (Bovespa, Merval, IPC) — grafik ve Piyasa Nabzı dahil"]},
   {s:61, t:"2026-11-08", n:["Ana ekranda Gizle açıksa PDF rapor tutarsız üretilir: yalnız yüzdeler, dağılım ve kâr/zarar oranları"]},
   {s:60, t:"2026-11-08", n:["Kripto kayıtlarında \"Kripto borsası\" yerine borsanın adı (Binance, BtcTurk) görünür; PDF raporda da","Aynı coin birden çok borsadaysa tek satırda: dolar bazında ortalama maliyet ve kâr/zarar","Binance'taki coinler için canlı fiyat (TWT, DASH, CHZ, THETA, AXS, RVN, FLR…)"]},
   {s:59, t:"2026-11-08", n:["İçe aktarma bağlantısı altın ve gümüş alımlarını (tarih ve maliyetle) destekler"]},
@@ -887,6 +888,18 @@ async function kriptoAl(){
   try { const r = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=60&page=1&price_change_percentage=24h");
     if (r.ok){ kriptoListe = await r.json(); if (tab==="izle" && screen==="app") izListeYenile(); } } catch {}
 }
+/* Dünya endeksleri: [anahtar, Yahoo kodu, ad, ülke · bölge, simge, renk] — renk bölgeye göre */
+const DUNYA_ENDEKS = [
+  ["DAX","^GDAXI","DAX 40","Almanya · Avrupa","DE","#1864ab"], ["FTSE","^FTSE","FTSE 100","İngiltere · Avrupa","UK","#1864ab"],
+  ["CAC","^FCHI","CAC 40","Fransa · Avrupa","FR","#1864ab"], ["SX5E","^STOXX50E","Euro Stoxx 50","Euro Bölgesi · Avrupa","EU","#1864ab"],
+  ["MIB","FTSEMIB.MI","FTSE MIB","İtalya · Avrupa","IT","#1864ab"], ["IBEX","^IBEX","IBEX 35","İspanya · Avrupa","ES","#1864ab"],
+  ["N225","^N225","Nikkei 225","Japonya · Uzakdoğu","JP","#c2255c"], ["HSI","^HSI","Hang Seng","Hong Kong · Uzakdoğu","HK","#c2255c"],
+  ["SSE","000001.SS","Şanghay Bileşik","Çin · Uzakdoğu","CN","#c2255c"], ["KOSPI","^KS11","KOSPI","Güney Kore · Uzakdoğu","KR","#c2255c"],
+  ["TWII","^TWII","TAIEX","Tayvan · Uzakdoğu","TW","#c2255c"],
+  ["NIFTY","^NSEI","Nifty 50","Hindistan","IN","#e8590c"], ["SENSEX","^BSESN","Sensex","Hindistan","IN","#e8590c"],
+  ["BVSP","^BVSP","Bovespa","Brezilya · Güney Amerika","BR","#2b8a3e"], ["MERV","^MERV","Merval","Arjantin · Güney Amerika","AR","#2b8a3e"],
+  ["MXX","^MXX","IPC","Meksika · Latin Amerika","MX","#2b8a3e"],
+];
 const IZ_GRUP = [["fav","★ Favoriler"],["tum","Tümü"],["kripto","Kripto"],["hisse","Hisseler"],["endeks","Endeksler"],["doviz","Döviz"],["emtia","Emtia"],["fon","Fonlar"]];
 const IZ_VARSAYILAN = ["c:bitcoin","c:ethereum","c:ripple","ONS","AGONS","gram24","USD","EUR","GBP","XU100","GSPC","IXIC","a:NVDA","a:AAPL","a:TSLA"];
 let izGrup = "fav", izAra = "";
@@ -914,6 +927,7 @@ function izEvren(){
   // endeksler
   for (const k of ["XU100","XU030","GSPC","IXIC"]) if (piy[k]) ekle({...piy[k], alt:k.startsWith("XU")?"Borsa İstanbul":"ABD", grp:"endeks"});
   if (e["^DJI"]) ekle({k:"DJI", l:"Dow Jones", alt:"ABD", grp:"endeks", ik:"DJ", ir:"#364fc7", v:e["^DJI"].p, ch:e["^DJI"].ch, f:fN2});
+  for (const [k, t, l, alt, ik, ir] of DUNYA_ENDEKS) if (e[t]) ekle({k, l, alt, grp:"endeks", ik, ir, v:e[t].p, ch:e[t].ch, f:fN2});
   // hisseler
   const ad = canli?.adlar || {};
   for (const [kod, x] of Object.entries(canli?.bist||{})) ekle({k:"b:"+kod, l:kod, alt:(ad.bist?.[kod]||"")+" · BIST", grp:"hisse", ik:kod.slice(0,3), ir:"#e03131", v:x.p, ch:x.ch, f:fTL2n});
