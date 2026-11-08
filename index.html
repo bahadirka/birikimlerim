@@ -202,8 +202,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 64; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 65; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:65, t:"2026-11-09", n:["Hisse (BIST), Hisse (ABD) ve Yatırım Fonu için de kurum kartları: her banka/aracı kurumun portföy büyüklüğü ve kâr/zararı; dokununca yalnız o kurum listelenir"]},
   {s:64, t:"2026-11-09", n:["Kripto: borsa kartları (Binance, BtcTurk…) — her borsanın portföy büyüklüğü (TL ve $) ve kâr/zararı; dokununca liste yalnız o borsayı gösterir","Endeks fiyatı gelmezse son kapanıştan gösterilir (Merval)"]},
   {s:63, t:"2026-11-09", n:["Borç/Alacak: \"✓ Ödendi\" ile kapatma (Kapananlar listesi, geri alınabilir); kapananlar toplamlara ve rapora girmez","Özet'te açık alacak hatırlatması (pazartesileri ve vadesi geçenlerde)"]},
   {s:62, t:"2026-11-09", n:["İzleme → Endeksler: Avrupa (DAX, FTSE 100, CAC 40, Euro Stoxx 50, FTSE MIB, IBEX 35), Uzakdoğu (Nikkei, Hang Seng, Şanghay, KOSPI, TAIEX), Hindistan (Nifty 50, Sensex), Güney/Latin Amerika (Bovespa, Merval, IPC) — grafik ve Piyasa Nabzı dahil"]},
@@ -2221,26 +2222,36 @@ document.addEventListener("click", e => {
   siralama = b.dataset.sirala; try { localStorage.setItem("siralama", siralama); } catch {} render();
 }, true);
 let malAcik = false;
-/* Kripto: borsa (Binance, BtcTurk…) bazında portföy büyüklüğü ve kâr/zarar; bir borsa seçilince liste yalnız onu gösterir */
-let kriptoBorsaSec = (() => { try { return localStorage.getItem("kriptoBorsa") || ""; } catch { return ""; } })();
-document.addEventListener("click", e => { const b = e.target.closest("[data-kborsa]"); if (!b) return; e.stopPropagation();
-  kriptoBorsaSec = kriptoBorsaSec===b.dataset.kborsa ? "" : b.dataset.kborsa; try { localStorage.setItem("kriptoBorsa", kriptoBorsaSec); } catch {} render(); }, true);
-function kriptoBorsaHesap(l){
-  let v = 0, vU = 0, mU = 0, dU = 0, n = 0;
-  for (const a of l){ const d = degerTL(a), u = usdDeger(a), m = maliyetUSD(a); n++;
-    if (d!=null) v += d; if (u!=null) vU += u; if (m!=null && u!=null){ mU += m; dU += u; } }
-  return {v, vU, mU, kzU: mU ? dU - mU : null, oranU: mU ? (dU/mU - 1)*100 : null, n};
+/* Kurum bazında portföy kartları (Kripto: Binance, BtcTurk… · Hisse/Fon: Garanti, Yapı Kredi, TEB…)
+   Her kurumun büyüklüğü ve kâr/zararı; karta dokununca liste yalnız o kurumu gösterir. */
+const KURUM_TIPLER = ["bist","abd","fon","kripto"];
+let kurumSec = (() => { try { return JSON.parse(localStorage.getItem("kurumSec") || "{}") || {}; } catch { return {}; } })();
+document.addEventListener("click", e => { const b = e.target.closest("[data-kurum]"); if (!b) return; e.stopPropagation();
+  const [tip, ad] = b.dataset.kurum.split("|"); kurumSec[tip] = kurumSec[tip]===ad ? "" : ad;
+  try { localStorage.setItem("kurumSec", JSON.stringify(kurumSec)); } catch {} render(); }, true);
+const kurumAdi = a => kurumAd(a) || "Diğer";
+function kurumHesap(tip, l){
+  const usd = tip==="abd" || tip==="kripto"; let v = 0, vU = 0, mal = 0, malDeg = 0, n = 0;
+  for (const a of l){ const d = degerTL(a); n++; if (d!=null) v += d;
+    if (usd){ const u = usdDeger(a), m = maliyetUSD(a); if (u!=null) vU += u; if (m!=null && u!=null){ mal += m; malDeg += u; } }
+    else { const m = maliyetTL(a); if (m!=null && d!=null){ mal += m; malDeg += d; } } }
+  return {usd, v, vU, kz: mal ? malDeg - mal : null, oran: mal ? (malDeg/mal - 1)*100 : null, n};
 }
-function kriptoBorsaOzet(l){
-  const borsalar = [...new Set(l.map(a=>kurumAd(a)||"Diğer"))]; if (borsalar.length < 2 && !kriptoBorsaSec) return "";
-  const satirlar = borsalar.map(b => ({b, h: kriptoBorsaHesap(l.filter(a=>(kurumAd(a)||"Diğer")===b))})).sort((x,y)=>y.h.v-x.h.v);
-  const hepsi = kriptoBorsaHesap(l);
-  const kz = h => h.kzU==null ? `<span class="muted">maliyet yok</span>` : `<span class="${h.kzU>=0?"pos":"neg"}">${gizli?"":yuzde(h.oranU,2)+" · "}${gizli?"••••":(h.kzU>=0?"+":"−")+fUSD.format(Math.abs(h.kzU))}</span>`;
-  const kart = (b, h, sec) => `<div class="kb-kart${sec?" on":""}" data-kborsa="${esc(b)}"><div class="kb-ad">${esc(b)} <span class="muted">· ${h.n} coin</span></div>
-    <div class="kb-deger">${para(h.v)}</div><div class="muted" style="font-size:12px">${gizli?"••••":fUSD.format(h.vU)}</div><div style="font-size:13px;font-weight:600;margin-top:2px">${kz(h)}</div></div>`;
-  return `<div class="kb-izgara">${satirlar.map(x=>kart(x.b, x.h, kriptoBorsaSec===x.b)).join("")}</div>
-    ${kriptoBorsaSec ? `<div class="row" style="padding:2px 2px 8px;border:0"><span class="muted">Yalnız <b>${esc(kriptoBorsaSec)}</b> gösteriliyor</span><button class="iconbtn" data-kborsa="${esc(kriptoBorsaSec)}" style="margin:0">Tüm borsalar</button></div>`
-      : `<div class="muted" style="font-size:12px;padding:0 2px 8px">Toplam kâr/zarar: ${kz(hepsi)} · Bir borsaya dokunun, yalnız onun coinleri listelensin.</div>`}`;
+function kurumListe(tip, l){ const s = kurumSec[tip]; return s && l.some(a=>kurumAdi(a)===s) ? l.filter(a=>kurumAdi(a)===s) : l; }
+function kurumOzet(tip, l){
+  const kurumlar = [...new Set(l.map(kurumAdi))], sec = kurumSec[tip] && kurumlar.includes(kurumSec[tip]) ? kurumSec[tip] : "";
+  if (kurumlar.length < 2) return "";
+  const birim = tip==="kripto" ? "coin" : tip==="fon" ? "fon" : "hisse";
+  const tekil = a => (a.type==="bist"||a.type==="abd"||a.type==="fon"||a.type==="kripto") ? String(a.symbol||"").toUpperCase() : a.id;
+  const satirlar = kurumlar.map(b => { const ll = l.filter(a=>kurumAdi(a)===b); return {b, h: kurumHesap(tip, ll), say: new Set(ll.map(tekil)).size}; }).sort((x,y)=>y.h.v-x.h.v);
+  const hepsi = kurumHesap(tip, l), top = hepsi.v || 1;
+  const kz = h => h.kz==null ? `<span class="muted">maliyet yok</span>`
+    : `<span class="${h.kz>=0?"pos":"neg"}">${gizli?"":yuzde(h.oran,2)+" · "}${gizli?"••••":(h.kz>=0?"+":"−")+(h.usd ? fUSD.format(Math.abs(h.kz)) : para(Math.abs(h.kz)))}</span>`;
+  const kart = x => `<div class="kb-kart${sec===x.b?" on":""}" data-kurum="${esc(tip+"|"+x.b)}"><div class="kb-ad">${esc(x.b)} <span class="muted">· ${x.say} ${birim}</span></div>
+    <div class="kb-deger">${para(x.h.v)}</div><div class="muted" style="font-size:12px">${x.h.usd ? (gizli?"••••":fUSD.format(x.h.vU)) : `grubun %${fN2.format(x.h.v/top*100)}'i`}</div><div style="font-size:13px;font-weight:600;margin-top:2px">${kz(x.h)}</div></div>`;
+  return `<div class="kb-izgara">${satirlar.map(kart).join("")}</div>
+    ${sec ? `<div class="row" style="padding:2px 2px 8px;border:0"><span class="muted">Yalnız <b>${esc(sec)}</b> gösteriliyor</span><button class="iconbtn" data-kurum="${esc(tip+"|"+sec)}" style="margin:0">Tüm kurumlar</button></div>`
+      : `<div class="muted" style="font-size:12px;padding:0 2px 8px">Toplam kâr/zarar: ${kz(hepsi)} · Bir ${tip==="kripto"?"borsaya":"kuruma"} dokunun, yalnız onun ${tip==="kripto"?"coinleri":"varlıkları"} listelensin.</div>`}`;
 }
 function varliklar(){
   if (!S.assets.length) return `<div class="card"><p class="muted">Henüz varlık yok.</p><button class="btn" data-tab="ekle">Varlık ekle</button></div>`;
@@ -2254,9 +2265,8 @@ function varliklar(){
   return ust + sir + Object.keys(TYPES).filter(k=>k!=="alacak"&&k!=="borc"&&(!filtre||k===filtre)).map(k=>{
     const l = S.assets.filter(a=>a.type===k); if (!l.length) return "";
     const usdT = (k==="kripto"||k==="abd") ? l.reduce((x,a)=>x+(usdDeger(a)||0),0) : 0;
-    if (k==="kripto"){ const ks = kriptoBorsaSec && l.some(a=>kurumAd(a)===kriptoBorsaSec) ? l.filter(a=>kurumAd(a)===kriptoBorsaSec) : l;
-      return `<h2>${TYPES[k].ad} · ${para(toplam(l).v)}${usdT?` · ${para(usdT, fUSD)}`:""}</h2>${kriptoBorsaOzet(l)}<div class="card">${siraliListe(grupla(ks)).map(gSatir).join("")}</div>`; }
-    return `<h2>${TYPES[k].ad} · ${para(toplam(l).v)}${usdT?` · ${para(usdT, fUSD)}`:""}</h2><div class="card">${siraliListe(grupla(l)).map(gSatir).join("")}</div>${k==="bist"?bistOzet(l):""}`;
+    const ks = KURUM_TIPLER.includes(k) ? kurumListe(k, l) : l;
+    return `<h2>${TYPES[k].ad} · ${para(toplam(l).v)}${usdT?` · ${para(usdT, fUSD)}`:""}</h2>${KURUM_TIPLER.includes(k) ? kurumOzet(k, l) : ""}<div class="card">${siraliListe(grupla(ks)).map(gSatir).join("")}</div>${k==="bist"?bistOzet(ks):""}`;
   }).join("");
 }
 /* BIST endeks üyeliği — Ekim–Aralık 2026 dönemi (her çeyrek güncellenir) */
