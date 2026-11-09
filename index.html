@@ -135,6 +135,16 @@ main a{color:var(--acc)}
 .od-ozet div{display:flex;flex-direction:column;gap:2px}
 .od-ozet span{font-size:12px}
 .od-ozet b{font-size:16px}
+.isi-kart{padding:10px}
+.isi-ust{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.isi{position:relative;width:100%;aspect-ratio:1.25/1;border-radius:12px;overflow:hidden;background:var(--line)}
+.isi-kare{position:absolute;box-sizing:border-box;border:1.5px solid var(--card);cursor:pointer;transition:background .6s,filter .2s;color:#fff}
+.isi-kare:active{filter:brightness(1.15)}
+.isi-ic{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2px;overflow:hidden;line-height:1.15;text-shadow:0 1px 2px rgba(0,0,0,.25)}
+.isi-ic small{font-size:11px;opacity:.9;margin-top:2px}
+.isi-alt{font-size:11px;margin-top:8px;display:flex;align-items:center;gap:6px}
+.isi-nokta{width:7px;height:7px;border-radius:50%;background:var(--pos);flex:none;animation:nabiz 2s ease-in-out infinite}
+@keyframes nabiz{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
 .sirala{display:flex;gap:6px;align-items:center;overflow-x:auto;scrollbar-width:none;margin:0 -16px 4px;padding:2px 16px 6px}
 .sirala::-webkit-scrollbar{display:none}
 .sirala span{flex:none;font-size:12px}
@@ -206,8 +216,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 66; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 67; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:67, t:"2026-11-09", n:["Kripto, BIST, ABD ve fonlarda renkli kareler (ısı haritası): kare büyüklüğü değer, renk günlük değişim (yeşil artış, kırmızı düşüş); \"Kâr / zarar\" moduna geçilebilir","Fiyatların ne zaman güncellendiği her ekranda","Ayarlar: bu cihazda açık alacakları her açılışta gösterme ve takvime haftalık bildirim (eşinizin telefonu için)"]},
   {s:66, t:"2026-11-09", n:["Borç/Alacak: parça ödeme — \"💵 Ödeme gir\" ile tutar, tarih ve not girin; kalan otomatik düşer, geçmiş tutulur","\"✓ Tamamı\" kalanın tamamını kapatır; \"Geri al\" son ödemeyi geri alır"]},
   {s:65, t:"2026-11-09", n:["Hisse (BIST), Hisse (ABD) ve Yatırım Fonu için de kurum kartları: her banka/aracı kurumun portföy büyüklüğü ve kâr/zararı; dokununca yalnız o kurum listelenir"]},
   {s:64, t:"2026-11-09", n:["Kripto: borsa kartları (Binance, BtcTurk…) — her borsanın portföy büyüklüğü (TL ve $) ve kâr/zararı; dokununca liste yalnız o borsayı gösterir","Endeks fiyatı gelmezse son kapanıştan gösterilir (Merval)"]},
@@ -448,7 +459,8 @@ async function fiyatlariAl(){
   try {
     const r = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${all.join(",")}&vs_currencies=try,usd&include_24hr_change=true`);
     const j = await r.json();
-    for (const id of all) if (j[id]) prices.crypto[id] = {try:j[id].try, usd:j[id].usd, ch:j[id].try_24h_change};
+    for (const id of all) if (j[id]) prices.crypto[id] = {try:j[id].try, usd:j[id].usd, ch:j[id].try_24h_change, chU:j[id].usd_24h_change};
+    prices.kriptoZaman = Date.now();
     prices.ch = prices.ch || {};
     if (j.bitcoin?.try_24h_change!=null) prices.ch.btc = j.bitcoin.try_24h_change;
     if (j.bitcoin?.usd_24h_change!=null) prices.ch.btcUSD = j.bitcoin.usd_24h_change;
@@ -1789,10 +1801,80 @@ function besHesapFormu(a, v){
 function besUyari(){
   const eski = S.assets.filter(a=>a.type==="bes" && a.hesap).map(a=>({a, g:besGun(a)})).filter(x=>x.g!=null && x.g>=7);
   if (!eski.length) return "";
-  return `<div class="card tap" data-tab="varlik" data-besfiltre="1" style="border-color:#f08c00"><b>📸 BES güncellemesi</b><p class="muted" style="margin:4px 0 0">${eski.map(x=>`${esc(x.a.kisi||"")}: ${x.g} gün önce`).join(" · ")}. Güncel BES ekran görüntülerini Claude'a gönderin.</p></div>`;
+  return `<div class="card tap" data-kat="bes" style="border-color:#f08c00"><b>📸 BES güncellemesi</b><p class="muted" style="margin:4px 0 0">${eski.map(x=>`${esc(x.a.kisi||"")}: ${x.g} gün önce`).join(" · ")}. Güncel BES ekran görüntülerini Claude'a gönderin.</p></div>`;
 }
-document.addEventListener("click", e => { if (e.target.closest("[data-besfiltre]")) filtre = "bes"; }, true);
 
+/* ============ Isı haritası: kareler değere göre büyük, renk günlük değişime (ya da kâr/zarara) göre ============ */
+let isiMod = (() => { try { return localStorage.getItem("isiMod") || "gun"; } catch { return "gun"; } })();
+document.addEventListener("click", e => { const b = e.target.closest("[data-isimod]"); if (!b) return; e.stopPropagation(); isiMod = b.dataset.isimod; try { localStorage.setItem("isiMod", isiMod); } catch {} render(); }, true);
+function kareYerlestir(items, W, H){   // squarified treemap
+  const out = []; let x = 0, y = 0, w = W, h = H, kalan = items.slice();
+  const kotu = (r, kisa) => { const s = r.reduce((t,o)=>t+o.a,0), mx = Math.max(...r.map(o=>o.a)), mn = Math.min(...r.map(o=>o.a)); return Math.max(kisa*kisa*mx/(s*s), s*s/(kisa*kisa*mn)); };
+  while (kalan.length){
+    const kisa = Math.min(w, h); let sira = [kalan[0]], i = 1;
+    while (i < kalan.length && kotu([...sira, kalan[i]], kisa) <= kotu(sira, kisa)){ sira.push(kalan[i]); i++; }
+    const s = sira.reduce((t,o)=>t+o.a,0);
+    if (w >= h){ const cw = s/h; let cy = y; for (const o of sira){ const ch = o.a/cw; out.push({...o, x, y:cy, w:cw, h:ch}); cy += ch; } x += cw; w -= cw; }
+    else { const rh = s/w; let cx = x; for (const o of sira){ const cw = o.a/rh; out.push({...o, x:cx, y, w:cw, h:rh}); cx += cw; } y += rh; h -= rh; }
+    kalan = kalan.slice(i);
+  }
+  return out;
+}
+function isiRenk(v, olcek){
+  if (v==null || !isFinite(v)) return "#6b7280";
+  const t = Math.min(1, Math.abs(v)/olcek), a = [107,114,128], b = v>=0 ? [22,150,72] : [214,40,40], k = 0.3 + 0.7*t;
+  return `rgb(${a.map((c,i)=>Math.round(c+(b[i]-c)*k)).join(",")})`;
+}
+const zamanOnce = ms => { if (!ms) return "—"; const d = (Date.now()-ms)/60000; return d < 1 ? "az önce" : d < 60 ? `${Math.round(d)} dk önce` : d < 1440 ? `${Math.round(d/60)} saat önce` : new Date(ms).toLocaleDateString("tr-TR"); };
+function guncellemeMetni(tip){
+  const saat = ms => ms ? new Date(ms).toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit"}) : "—";
+  if (tip==="kripto") return `Kripto fiyatları anlık · son yenileme ${saat(prices.kriptoZaman)} (${zamanOnce(prices.kriptoZaman)})`;
+  if (tip==="fon"){ const t = Object.values(canli?.fon||{}).map(f=>f.t).filter(Boolean).sort().pop(); return `Fon fiyatları TEFAS günlük · ${t ? new Date(t).toLocaleDateString("tr-TR")+" kapanışı" : "—"}`; }
+  const g = canli?.guncel ? Date.parse(canli.guncel) : null;
+  return `${tip==="abd"?"ABD":"BIST"} fiyatları ~15 dk gecikmeli · güncellendi ${saat(g)} (${zamanOnce(g)})`;
+}
+function isiHaritasi(tip, l){
+  const m = new Map();
+  for (const a of l){ const k = String(a.symbol||"").toUpperCase() || a.id; if (!m.has(k)) m.set(k, []); m.get(k).push(a); }
+  let ogeler = [...m.entries()].map(([k, g]) => {
+    const v = g.reduce((x,a)=>x+(degerTL(a)||0),0), a0 = g[0];
+    const ch = tip==="kripto" ? (prices.crypto[cgId(a0.symbol)]?.chU ?? prices.crypto[cgId(a0.symbol)]?.ch) : canliFiyat(a0)?.ch;
+    const h = g.length > 1 ? gHesap({grup:g, anahtar:k}) : null, kh = g.length===1 ? kzHesap(a0) : null;
+    const kz = h ? (h.oranU ?? h.oran) : kh?.oran ?? null;
+    return {k, v, ch: ch==null ? null : +ch, kz, id: a0.id, n: g.length};
+  }).filter(o=>o.v>0).sort((x,y)=>y.v-x.v);
+  if (!ogeler.length) return "";
+  if (ogeler.length > 24){ const dig = ogeler.slice(23); ogeler = ogeler.slice(0,23).concat({k:`+${dig.length} diğer`, v:dig.reduce((x,o)=>x+o.v,0), ch:null, kz:null, id:null}); }
+  const top = ogeler.reduce((x,o)=>x+o.v,0), W = 1.25, H = 1;
+  const kareler = kareYerlestir(ogeler.map(o=>({...o, a:o.v/top*W*H})), W, H);
+  const deger = o => isiMod==="kz" ? o.kz : o.ch, olcek = isiMod==="kz" ? 40 : 4;
+  const yukselen = ogeler.filter(o=>(deger(o)??0)>0).length, dusen = ogeler.filter(o=>(deger(o)??0)<0).length;
+  const kutular = kareler.map(o => { const v = deger(o), alan = o.w*o.h/(W*H), buyuk = alan > 0.045, orta = alan > 0.015;
+    return `<div class="isi-kare"${o.id?` data-detay="${esc(o.id)}"`:""} style="left:${(o.x/W*100).toFixed(3)}%;top:${(o.y/H*100).toFixed(3)}%;width:${(o.w/W*100).toFixed(3)}%;height:${(o.h/H*100).toFixed(3)}%;background:${isiRenk(v, olcek)}">
+      <div class="isi-ic"><b style="font-size:${buyuk?15:orta?12:10}px">${esc(o.k)}</b>${orta?`<span style="font-size:${buyuk?14:11}px">${v==null?"—":yuzde(v, buyuk?2:1)}</span>`:""}${buyuk&&!gizli?`<small>${para(o.v)}</small>`:""}</div></div>`; }).join("");
+  return `<div class="card isi-kart">
+    <div class="isi-ust"><div class="seg">${[["gun","Bugün"],["kz","Kâr / zarar"]].map(([k,t])=>`<button data-isimod="${k}" class="${isiMod===k?"on":""}">${t}</button>`).join("")}</div>
+      <span class="muted" style="font-size:12px"><span class="pos">▲ ${yukselen}</span> · <span class="neg">▼ ${dusen}</span></span></div>
+    <div class="isi">${kutular}</div>
+    <div class="muted isi-alt"><span class="isi-nokta"></span>${guncellemeMetni(tip)}</div></div>`;
+}
+/* Bu cihaz için hatırlatma ayarları (eşinizin telefonunda ayrı seçilebilir) + takvime haftalık hatırlatma */
+const alacakHerZaman = () => lsGet("alacakHerZaman")==="1";
+function takvimHatirlatma(){
+  const ics = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Birikimlerim//TR","BEGIN:VEVENT",`UID:birikimlerim-alacak-${Date.now()}@birikimlerim`,
+    `DTSTAMP:${new Date().toISOString().replace(/[-:]/g,"").slice(0,15)}Z`,"DTSTART;TZID=Europe/Istanbul:20261116T100000","DURATION:PT15M","RRULE:FREQ=WEEKLY;BYDAY=MO",
+    "SUMMARY:💰 Birikimlerim — alacak kontrolü","DESCRIPTION:Geri ödenmemiş alacaklar Birikimlerim'de Özet'in en üstünde. Tahsil edilenleri Borç/Alacak'ta işaretleyin.",
+    "URL:https://bahadirka.github.io/birikimlerim/","BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:Alacak kontrolü","TRIGGER:PT0M","END:VALARM","END:VEVENT","END:VCALENDAR"].join("\r\n");
+  const u = URL.createObjectURL(new Blob([ics], {type:"text/calendar"})), l = document.createElement("a");
+  l.href = u; l.download = "birikimlerim-alacak-hatirlatma.ics"; l.click(); setTimeout(()=>URL.revokeObjectURL(u), 60000);
+}
+function hatirlatmaAyar(){
+  return `<div class="card"><div><b>Bu cihazda hatırlatmalar</b></div>
+    <p class="muted" style="margin:4px 0 8px">Her telefon kendi seçimini saklar; eşinizin telefonunda ayrıca ayarlanabilir.</p>
+    <label class="rp-k"><input type="checkbox" data-act="alacakHerZaman" ${alacakHerZaman()?"checked":""}><span style="flex:1">Açık alacakları her açılışta ekranın üstünde göster<br><span class="muted" style="font-size:12px">Kapalıyken: pazartesileri ve vadesi geçince</span></span></label>
+    <button class="btn ghost" data-act="takvimHatirlat">📅 Takvime haftalık bildirim ekle (Pazartesi 10:00)</button>
+    <p class="muted" style="font-size:12px;margin:4px 0 0">iPhone takvimine her pazartesi 10:00'da çalan bir hatırlatma ekler; bildirime dokununca uygulama açılır.</p></div>`;
+}
 function kivilcim(seri, yon){
   if (!seri || seri.length < 3) return "";
   const mn = Math.min(...seri), mx = Math.max(...seri), rg = (mx-mn) || 1, W=160, H=48;
@@ -2040,6 +2122,7 @@ function ayarlar(){
     <label>Tekrar</label><input id="np2" type="password" autocomplete="new-password">
     <button class="btn ghost" data-act="parolaDegis">Parolayı değiştir</button>
   </div>`:""}
+  ${hatirlatmaAyar()}
   <button class="btn ghost" data-tab="rapor">📄 Rapor oluştur · PDF paylaş</button>
   <button class="btn ghost" data-act="yedek">Şifreli yedek indir</button>
   <button class="btn ghost" data-act="cikisApp">Hesaptan çıkış</button>
@@ -2271,7 +2354,7 @@ function varliklar(){
     const l = S.assets.filter(a=>a.type===k); if (!l.length) return "";
     const usdT = (k==="kripto"||k==="abd") ? l.reduce((x,a)=>x+(usdDeger(a)||0),0) : 0;
     const ks = KURUM_TIPLER.includes(k) ? kurumListe(k, l) : l;
-    return `<h2>${TYPES[k].ad} · ${para(toplam(l).v)}${usdT?` · ${para(usdT, fUSD)}`:""}</h2>${KURUM_TIPLER.includes(k) ? kurumOzet(k, l) : ""}<div class="card">${siraliListe(grupla(ks)).map(gSatir).join("")}</div>${k==="bist"?bistOzet(ks):""}`;
+    return `<h2>${TYPES[k].ad} · ${para(toplam(l).v)}${usdT?` · ${para(usdT, fUSD)}`:""}</h2>${KURUM_TIPLER.includes(k) ? kurumOzet(k, l) : ""}${filtre===k && KURUM_TIPLER.includes(k) ? isiHaritasi(k, ks) : ""}<div class="card">${siraliListe(grupla(ks)).map(gSatir).join("")}</div>${k==="bist"?bistOzet(ks):""}`;
   }).join("");
 }
 /* BIST endeks üyeliği — Ekim–Aralık 2026 dönemi (her çeyrek güncellenir) */
@@ -2367,7 +2450,7 @@ document.addEventListener("click", async e => {
 function alacakUyari(){
   const acik = S.assets.filter(a=>a.type==="alacak" && !a.odendi); if (!acik.length) return "";
   const gecmis = acik.filter(a=>a.vade && a.vade < bugun()), pzt = new Date().getDay()===1;
-  if (!gecmis.length && !pzt) return "";
+  if (!gecmis.length && !pzt && !alacakHerZaman()) return "";
   const top = acik.reduce((x,a)=>x+(degerTL(a)||0),0);
   return `<div class="card tap" data-tab="ba" style="border-color:var(--pos)"><b>💰 Açık alacaklar · ${para(top)}</b>
     <p class="muted" style="margin:4px 0 0">${acik.slice(0,5).map(a=>`${esc(a.kisi)}${a.vade && a.vade < bugun() ? ' <span class="neg">(vadesi geçti)</span>' : ""}`).join(" · ")}${acik.length>5?` · +${acik.length-5}`:""}. Ödenenleri "✓ Ödendi" ile kapatın.</p></div>`;
@@ -2540,6 +2623,8 @@ document.addEventListener("click", async e => {
     if (act==="detayGrafik") grafikAc(t.dataset.k);
     if (act==="detayPerf") fonPerfAc(t.dataset.k);
     if (act==="detaySil"){ const a = S.assets.find(x=>x.id===detayId); if (a && confirm(`${etiket(a)} (${kurumAd(a)}) silinsin mi?`)){ S.assets = S.assets.filter(x=>x.id!==detayId); detayId=null; tab="varlik"; render(); await kaydet(); } }
+    if (act==="alacakHerZaman"){ lsSet("alacakHerZaman", alacakHerZaman() ? "0" : "1"); toast(alacakHerZaman() ? "Açık alacaklar her açılışta gösterilecek" : "Yalnız pazartesi ve vadesi geçince"); render(); return; }
+    if (act==="takvimHatirlat"){ takvimHatirlatma(); return; }
     if (act==="kilitle") kilitle();
     if (act==="gizle"){ gizli=!gizli; lsSet("gizle",gizli?"1":"0"); render(); }
     if (act==="yenile") fiyatlariAl();
