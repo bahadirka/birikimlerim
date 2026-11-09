@@ -10,6 +10,16 @@ UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.3
 try: eski = {v["id"]: v for v in json.loads(ONCEKI.read_text(encoding="utf-8")).get("videolar", [])}
 except Exception: eski = {}
 hata, videolar = [], []
+def kanal_id():
+    try:
+        r = requests.get("https://www.youtube.com/@BurakArslanb4thenews", headers={**UA, "Cookie": "CONSENT=YES+1"}, timeout=30)
+        for desen in (r'"externalId":"(UC[\w-]{22})"', r'"channelId":"(UC[\w-]{22})"', r'youtube\.com/channel/(UC[\w-]{22})'):
+            m = re.search(desen, r.text)
+            if m: return m.group(1)
+    except Exception as e:
+        hata.append(f"kanal: {e}")
+    return KANAL
+KANAL = kanal_id(); print("kanal id:", KANAL)
 try:
     r = requests.get(f"https://www.youtube.com/feeds/videos.xml?channel_id={KANAL}", headers=UA, timeout=30); r.raise_for_status()
     for e in re.findall(r"<entry>(.*?)</entry>", r.text, re.S)[:10]:
@@ -18,6 +28,16 @@ try:
         videolar.append({"id": vid, "baslik": g("title"), "tarih": g("published"), "link": f"https://www.youtube.com/watch?v={vid}", "aciklama": g("media:description")[:1500]})
 except Exception as e:
     hata.append(f"rss: {e}")
+if not videolar:   # yedek: b4thenews ana sayfasındaki gömülü videolar
+    try:
+        r = requests.get("https://www.b4thenews.com/", headers=UA, timeout=30)
+        for vid in list(dict.fromkeys(re.findall(r"youtube(?:-nocookie)?\.com/embed/([\w-]{11})", r.text)))[:6]:
+            t = ""
+            try: t = requests.get(f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={vid}&format=json", timeout=15).json().get("title", "")
+            except Exception: pass
+            videolar.append({"id": vid, "baslik": t, "tarih": "", "link": f"https://www.youtube.com/watch?v={vid}", "aciklama": ""})
+    except Exception as e:
+        hata.append(f"site video: {e}")
 def metin(vid):
     if eski.get(vid, {}).get("metin"): return eski[vid]["metin"]
     try:
@@ -30,7 +50,7 @@ def metin(vid):
 sinir = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=3)
 for v in videolar:
     try: yeni = dt.datetime.fromisoformat(v["tarih"]) >= sinir
-    except Exception: yeni = False
+    except Exception: yeni = True
     v["metin"] = metin(v["id"]) if yeni else eski.get(v["id"], {}).get("metin", "")
 site = []
 try:
