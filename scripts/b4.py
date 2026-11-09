@@ -47,6 +47,10 @@ def metin(vid):
         return " ".join(s.text for s in t)[:20000]
     except Exception as e:
         hata.append(f"metin {vid}: {type(e).__name__}"); return ""
+simdi = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+for v in videolar:   # ilk görüldüğü an: günlük özet "son 24 saatte yeni" videoları buradan seçer
+    v["ilk"] = eski.get(v["id"], {}).get("ilk") or simdi
+    if not v.get("baslik") and eski.get(v["id"], {}).get("baslik"): v["baslik"] = eski[v["id"]]["baslik"]
 sinir = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=3)
 for v in videolar:
     try: yeni = dt.datetime.fromisoformat(v["tarih"]) >= sinir
@@ -57,7 +61,7 @@ try:
     r = requests.get("https://www.b4thenews.com/", headers=UA, timeout=30)
     for u, b in re.findall(r'<a[^>]+href="(https://www\.b4thenews\.com/[^"#?]+/)"[^>]*>([^<]{12,160})</a>', r.text):
         b = html.unescape(b).strip()
-        if b and all(s["link"] != u for s in site): site.append({"baslik": b, "link": u})
+        if b and re.search(r"\d{2}-\d{2}-\d{4}", u) and all(s["link"] != u for s in site): site.append({"baslik": b, "link": u})   # yalnız tarihli analiz yazıları
 except Exception as e:
     hata.append(f"site: {e}")
 CIKTI.parent.mkdir(parents=True, exist_ok=True)
