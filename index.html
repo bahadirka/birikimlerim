@@ -131,6 +131,10 @@ main a{color:var(--acc)}
 .kb-kart.on{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
 .kb-ad{font-weight:700;font-size:15px}
 .kb-deger{font-size:18px;font-weight:700;margin-top:4px}
+.od-ozet{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:6px 0 8px}
+.od-ozet div{display:flex;flex-direction:column;gap:2px}
+.od-ozet span{font-size:12px}
+.od-ozet b{font-size:16px}
 .sirala{display:flex;gap:6px;align-items:center;overflow-x:auto;scrollbar-width:none;margin:0 -16px 4px;padding:2px 16px 6px}
 .sirala::-webkit-scrollbar{display:none}
 .sirala span{flex:none;font-size:12px}
@@ -202,8 +206,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 65; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 66; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:66, t:"2026-11-09", n:["Borç/Alacak: parça ödeme — \"💵 Ödeme gir\" ile tutar, tarih ve not girin; kalan otomatik düşer, geçmiş tutulur","\"✓ Tamamı\" kalanın tamamını kapatır; \"Geri al\" son ödemeyi geri alır"]},
   {s:65, t:"2026-11-09", n:["Hisse (BIST), Hisse (ABD) ve Yatırım Fonu için de kurum kartları: her banka/aracı kurumun portföy büyüklüğü ve kâr/zararı; dokununca yalnız o kurum listelenir"]},
   {s:64, t:"2026-11-09", n:["Kripto: borsa kartları (Binance, BtcTurk…) — her borsanın portföy büyüklüğü (TL ve $) ve kâr/zararı; dokununca liste yalnız o borsayı gösterir","Endeks fiyatı gelmezse son kapanıştan gösterilir (Merval)"]},
   {s:63, t:"2026-11-09", n:["Borç/Alacak: \"✓ Ödendi\" ile kapatma (Kapananlar listesi, geri alınabilir); kapananlar toplamlara ve rapora girmez","Özet'te açık alacak hatırlatması (pazartesileri ve vadesi geçenlerde)"]},
@@ -401,7 +406,7 @@ const CG = {BTC:"bitcoin",ETH:"ethereum",USDT:"tether",USDC:"usd-coin",BNB:"bina
 const cgId = s => CG[String(s||"").toUpperCase()] || String(s||"").toLowerCase().trim();
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const sayi = v => { if (v===""||v==null) return null; const n = parseFloat(String(v).replace(/\s/g,"").replace(",", ".")); return isNaN(n) ? null : n; };
+const sayi = v => { if (v===""||v==null) return null; let t = String(v).replace(/\s/g,""); if (t.includes(",")) t = t.replace(/\./g,"").replace(",", "."); const n = parseFloat(t); return isNaN(n) ? null : n; };   // "1.636.892,52" → 1636892.52; yalnız nokta → ondalık
 const fTL = new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",maximumFractionDigits:0});
 const fTLn = new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",maximumFractionDigits:0}); // her zaman TL (çevrilmez)
 const fTL2 = new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",maximumFractionDigits:2});
@@ -2293,11 +2298,69 @@ function bistOzet(l){
   </div>`;
 }
 
+/* ============ Parça ödeme: alacak/borçtan ödenen tutar düşülür, geçmiş tutulur ============
+   a.ilk = ilk tutar, a.qty = kalan, a.odemeler = [{t, tutar, not}], kalan 0 olunca a.odendi = tarih */
+const odenenTop = a => (a.odemeler||[]).reduce((x,o)=>x+(+o.tutar||0),0);
+const ilkTutar = a => a.ilk ?? ((+a.qty||0) + odenenTop(a));
+const yuv = v => Math.round(v*100)/100;
+const baFmt = (a, v) => gizli ? "••••" : (a.cur||"TRY")==="TRY" ? fTL2n.format(v) : new Intl.NumberFormat("tr-TR",{maximumFractionDigits:2}).format(v)+" "+a.cur;
+/* Tutar girişi Türkçe yazımla: "15.000" = on beş bin, "1.250,50" = bin iki yüz elli virgül elli */
+const trTutar = x => { let v = String(x ?? "").replace(/[\s₺TL]/gi, ""); if (!v) return null;
+  if (v.includes(",")) v = v.replace(/\./g, "").replace(",", "."); else if (/^\d{1,3}(\.\d{3})+$/.test(v)) v = v.replace(/\./g, "");
+  const n = Number(v); return isFinite(n) ? n : null; };
+let odDurum = null;
+function odCiz(){
+  const a = S?.assets.find(x=>x.id===odDurum?.id); let w = document.getElementById("odPencere");
+  if (!a){ w?.remove(); odDurum = null; return; }
+  if (!w){ w = document.createElement("div"); w.id = "odPencere"; w.className = "gp"; document.body.appendChild(w); }
+  const ilk = ilkTutar(a), odn = odenenTop(a), kalan = +a.qty||0, oran = ilk ? Math.min(100, odn/ilk*100) : 0, al = a.type==="alacak";
+  const gecmis = (a.odemeler||[]).map((o,i)=>({...o,i})).reverse();
+  w.innerHTML = `<div class="gp-kart" role="dialog" aria-label="Ödeme gir">
+    <div class="gp-ust"><b style="flex:1">${esc(a.kisi)} <span class="muted" style="font-weight:400">· ${al?"alacak":"borç"}</span></b><button class="iconbtn" data-od="kapat" aria-label="Kapat">✕</button></div>
+    <div class="od-ozet"><div><span class="muted">Toplam</span><b>${baFmt(a, ilk)}</b></div><div><span class="muted">${al?"Tahsil edilen":"Ödenen"}</span><b class="pos">${baFmt(a, odn)}</b></div><div><span class="muted">Kalan</span><b class="${kalan>0?(al?"":"neg"):"pos"}">${baFmt(a, kalan)}</b></div></div>
+    <div class="bes-cubuk" style="height:8px"><span style="width:${oran.toFixed(1)}%;background:var(--pos)"></span></div>
+    ${a.odendi ? `<p class="pos" style="margin:10px 0 0"><b>✓ Tamamı ${al?"tahsil edildi":"ödendi"}</b> · ${new Date(a.odendi).toLocaleDateString("tr-TR")}</p>` : `
+    <label>${al?"Alınan":"Ödenen"} tutar${(a.cur||"TRY")!=="TRY"?" ("+esc(a.cur)+")":" (TL)"}</label>
+    <div style="display:flex;gap:8px"><input id="odTutar" inputmode="decimal" placeholder="ör. 5000" style="flex:1"><button class="iconbtn" data-od="tamami" style="margin:0;white-space:nowrap">Kalanın tamamı</button></div>
+    <div style="display:flex;gap:8px"><div style="flex:1"><label>Tarih</label><input id="odTarih" type="date" value="${bugun()}"></div><div style="flex:1.4"><label>Not (isteğe bağlı)</label><input id="odNot" placeholder="ör. havale, elden"></div></div>
+    <button class="btn" data-od="kaydet">Kaydet</button>`}
+    ${gecmis.length ? `<h2 style="margin-top:14px">${al?"Tahsilatlar":"Ödemeler"}</h2>${gecmis.map(o=>`<div class="row" style="padding:8px 0"><div><b>${baFmt(a, +o.tutar)}</b><div class="muted" style="font-size:12px">${new Date(o.t).toLocaleDateString("tr-TR")}${o.not?" · "+esc(o.not):""}</div></div><button class="iconbtn" data-od="sil:${o.i}" style="margin:0">Sil</button></div>`).join("")}` : ""}
+  </div>`;
+}
+function odEkle(a, tutar, t, not){
+  const kalan = +a.qty||0; if (a.ilk==null) a.ilk = yuv(kalan + odenenTop(a));
+  (a.odemeler ||= []).push({t, tutar: yuv(tutar), not: not||""});
+  a.qty = yuv(Math.max(0, kalan - tutar)); if (a.qty <= 0.004){ a.qty = 0; a.odendi = t; }
+}
+document.addEventListener("click", async e => {
+  if (screen!=="app") return;
+  const ac = e.target.closest("[data-odgir]");
+  if (ac){ e.stopPropagation(); e.preventDefault(); odDurum = {id: ac.dataset.odgir}; odCiz(); setTimeout(()=>document.getElementById("odTutar")?.focus(), 50); return; }
+  const b = e.target.closest("[data-od]"); if (!b) return; e.stopPropagation();
+  const a = S.assets.find(x=>x.id===odDurum?.id), k = b.dataset.od;
+  if (k==="kapat" || !a){ odDurum = null; odCiz(); return; }
+  if (k==="tamami"){ const i = document.getElementById("odTutar"); if (i) i.value = String(+a.qty||0).replace(".", ","); return; }
+  if (k==="kaydet"){
+    const tutar = trTutar(document.getElementById("odTutar")?.value), t = document.getElementById("odTarih")?.value || bugun(), not = document.getElementById("odNot")?.value?.trim();
+    if (!tutar || tutar <= 0) return toast("Tutar girin");
+    if (tutar > (+a.qty||0) + 0.004 && !confirm("Girilen tutar kalandan fazla. Kalan sıfırlansın mı?")) return;
+    odEkle(a, Math.min(tutar, +a.qty||0) || tutar, t, not);
+    toast(a.odendi ? "Tamamı ödendi · Kapananlar listesinde" : `Kalan: ${baFmt(a, +a.qty)}`);
+    render(); odCiz(); await kaydet(); return;
+  }
+  if (k.startsWith("sil:")){ const i = +k.slice(4), o = a.odemeler?.[i]; if (!o || !confirm(`${baFmt(a, +o.tutar)} tutarındaki kayıt silinsin mi?`)) return;
+    a.odemeler.splice(i, 1); a.qty = yuv((+a.qty||0) + (+o.tutar||0)); if (a.qty > 0) delete a.odendi;
+    render(); odCiz(); await kaydet(); }
+}, true);
+/* "✓ Tamamı": kalanın tamamını bugünkü ödeme olarak kaydeder · "Geri al": son ödemeyi geri alır */
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-odendi]"); if (!b || screen!=="app") return; e.stopPropagation(); e.preventDefault();
   const a = S.assets.find(x=>x.id===b.dataset.odendi); if (!a) return;
-  if (b.dataset.geri){ delete a.odendi; toast("Yeniden açık olarak işaretlendi"); }
-  else { if (!confirm(`${a.kisi} — ${a.type==="alacak"?"alacak tahsil edildi":"borç ödendi"} olarak kapatılsın mı?`)) return; a.odendi = bugun(); toast("Kapandı · Kapananlar listesinde"); }
+  if (b.dataset.geri){
+    if (a.odemeler?.length){ const o = a.odemeler.pop(); a.qty = yuv((+a.qty||0) + (+o.tutar||0)); }
+    delete a.odendi; toast("Yeniden açık olarak işaretlendi");
+  } else { if (!confirm(`${a.kisi} — kalan ${baFmt(a, +a.qty||0)} ${a.type==="alacak"?"tahsil edildi":"ödendi"} olarak kapatılsın mı?`)) return;
+    odEkle(a, +a.qty||0, bugun(), "tamamı"); a.odendi = bugun(); toast("Kapandı · Kapananlar listesinde"); }
   render(); await kaydet();
 }, true);
 /* Açık alacak hatırlatması: pazartesi ya da vadesi geçmiş alacak varsa Özet'te */
@@ -2316,9 +2379,12 @@ function satirBA(a){
     const gun = Math.round((new Date(a.vade) - new Date(b)) / 86400000);
     vade = gun < 0 ? `<span class="neg">vadesi ${-gun} gün geçti</span>` : gun===0 ? `<span class="neg">vadesi bugün</span>` : `vade ${esc(a.vade)} (${gun} gün)`;
   }
+  const odn = odenenTop(a), ilk = ilkTutar(a);
   return `<div class="row tap" data-edit="${esc(a.id)}">
-    <div><div>${esc(a.kisi)}</div><div class="muted">${vade}${a.not?(vade?" · ":"")+esc(a.not):""}</div></div>
-    <div class="r"><div class="${a.type==="alacak"?"pos":"neg"}">${para(d)}</div>${a.cur&&a.cur!=="TRY"?`<div class="muted">${gizli?"••••":fN.format(a.qty)+" "+a.cur}</div>`:""}<button class="iconbtn" data-odendi="${esc(a.id)}" style="margin:4px 0 0">✓ Ödendi</button></div>
+    <div style="flex:1;min-width:0"><div>${esc(a.kisi)}</div><div class="muted">${vade}${a.not?(vade?" · ":"")+esc(a.not):""}</div>
+      ${odn ? `<div class="muted" style="font-size:12px;margin-top:3px">${baFmt(a, ilk)} tutarın ${baFmt(a, odn)} kısmı ${a.type==="alacak"?"tahsil edildi":"ödendi"}</div><div class="bes-cubuk" style="max-width:220px"><span style="width:${Math.min(100, odn/ilk*100).toFixed(1)}%;background:var(--pos)"></span></div>` : ""}</div>
+    <div class="r"><div class="${a.type==="alacak"?"pos":"neg"}">${para(d)}</div>${odn?`<div class="muted" style="font-size:11px">kalan</div>`:""}${a.cur&&a.cur!=="TRY"?`<div class="muted">${gizli?"••••":fN.format(a.qty)+" "+a.cur}</div>`:""}
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:4px"><button class="iconbtn" data-odgir="${esc(a.id)}" style="margin:0">💵 Ödeme gir</button><button class="iconbtn" data-odendi="${esc(a.id)}" style="margin:0">✓ Tamamı</button></div></div>
   </div>`;
 }
 function borcAlacak(){
@@ -2334,7 +2400,7 @@ function borcAlacak(){
   <h2>Alacaklar</h2><div class="card">${al.length?al.map(satirBA).join(""):'<p class="muted">Kayıtlı alacak yok.</p>'}<button class="btn ghost" data-yeni="alacak">+ Alacak ekle</button></div>
   <h2>Borçlar</h2><div class="card">${bo.length?bo.map(satirBA).join(""):'<p class="muted">Kayıtlı borç yok.</p>'}<button class="btn ghost" data-yeni="borc">+ Borç ekle</button></div>
   ${kapanan.length?`<h2>Kapananlar</h2><div class="card">${kapanan.map(a=>`<div class="row"><div><div class="muted">${esc(a.kisi)} · ${a.type==="alacak"?"alacak":"borç"}</div><div class="muted" style="font-size:12px">${new Date(a.odendi).toLocaleDateString("tr-TR")} tarihinde ödendi</div></div>
-    <div class="r"><div class="muted">${gizli?"••••":fN.format(a.qty)+" "+(a.cur||"TRY")}</div><button class="iconbtn" data-odendi="${esc(a.id)}" data-geri="1" style="margin:4px 0 0">Geri al</button></div></div>`).join("")}</div>`:""}`;
+    <div class="r"><div class="muted">${baFmt(a, ilkTutar(a))}</div><div style="display:flex;gap:6px;justify-content:flex-end;margin-top:4px">${(a.odemeler||[]).length?`<button class="iconbtn" data-odgir="${esc(a.id)}" style="margin:0">Geçmiş</button>`:""}<button class="iconbtn" data-odendi="${esc(a.id)}" data-geri="1" style="margin:0">Geri al</button></div></div></div>`).join("")}</div>`:""}`;
 }
 
 function kasa(){
