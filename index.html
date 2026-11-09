@@ -216,8 +216,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 67; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 68; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:68, t:"2026-11-09", n:["\"Yapı Kredi Ataşehir Özel Bankacılık\" kayıtları \"Yapı Kredi Bankası Ataşehir Özel Bankacılık\" altında birleştirildi; aynı kurumdaki aynı fon/hisse tek kayda indirildi (adet ve maliyet toplandı)","Ayarlar → Kurum adları: farklı yazılmış aynı kurumu tek ada birleştirme"]},
   {s:67, t:"2026-11-09", n:["Kripto, BIST, ABD ve fonlarda renkli kareler (ısı haritası): kare büyüklüğü değer, renk günlük değişim (yeşil artış, kırmızı düşüş); \"Kâr / zarar\" moduna geçilebilir","Fiyatların ne zaman güncellendiği her ekranda","Ayarlar: bu cihazda açık alacakları her açılışta gösterme ve takvime haftalık bildirim (eşinizin telefonu için)"]},
   {s:66, t:"2026-11-09", n:["Borç/Alacak: parça ödeme — \"💵 Ödeme gir\" ile tutar, tarih ve not girin; kalan otomatik düşer, geçmiş tutulur","\"✓ Tamamı\" kalanın tamamını kapatır; \"Geri al\" son ödemeyi geri alır"]},
   {s:65, t:"2026-11-09", n:["Hisse (BIST), Hisse (ABD) ve Yatırım Fonu için de kurum kartları: her banka/aracı kurumun portföy büyüklüğü ve kâr/zararı; dokununca yalnız o kurum listelenir"]},
@@ -1875,6 +1876,55 @@ function hatirlatmaAyar(){
     <button class="btn ghost" data-act="takvimHatirlat">📅 Takvime haftalık bildirim ekle (Pazartesi 10:00)</button>
     <p class="muted" style="font-size:12px;margin:4px 0 0">iPhone takvimine her pazartesi 10:00'da çalan bir hatırlatma ekler; bildirime dokununca uygulama açılır.</p></div>`;
 }
+/* ============ Kurum adı birleştirme ============
+   Aynı kurum farklı yazıldıysa (ör. "Yapı Kredi Ataşehir Özel Bankacılık" / "Yapı Kredi Bankası Ataşehir Özel Bankacılık") tek ada çekilir. */
+const kNorm = x => trKucuk(x).replace(/\s+/g, " ").trim();
+async function gocler(){
+  if (!S) return;
+  const yk = S.assets.filter(a => { const n = kNorm(a.konumNot); return n.includes("yapı kredi") && n.includes("ataşehir"); });
+  const hedef = yk.find(a => kNorm(a.konumNot).includes("bankası"))?.konumNot || "Yapı Kredi Bankası Ataşehir Özel Bankacılık";
+  const degisen = yk.filter(a => a.konumNot !== hedef);
+  for (const a of degisen) a.konumNot = hedef;
+  const birlesen = mukerrerBirlestir();
+  if (!degisen.length && !birlesen) return;
+  render(); await kaydet();
+  toast([degisen.length ? `${degisen.length} kayıt "${hedef}" altında toplandı` : "", birlesen ? `${birlesen} mükerrer kayıt birleştirildi` : ""].filter(Boolean).join(" · "));
+}
+/* Aynı kurumda aynı hisse/fon/coin birden çok kayıtsa tek kayıt: adetler toplanır, maliyetler toplam olarak toplanır (ağırlıklı ortalama) */
+function mukerrerBirlestir(){
+  const m = new Map(); let n = 0;
+  for (const a of S.assets){
+    if (!["bist","abd","fon","kripto"].includes(a.type) || a.hesap || !a.symbol) continue;
+    const k = [a.type, String(a.symbol).toUpperCase(), kurumAd(a), a.tutarCur||"", a.manualPrice!=null ? "elle" : ""].join("|");
+    if (!m.has(k)) m.set(k, []); m.get(k).push(a);
+  }
+  const sil = new Set();
+  for (const g of m.values()){
+    if (g.length < 2) continue;
+    const malli = g.filter(a=>sayi(a.cost)!=null), pb = new Set(malli.map(a=>a.costCur||"TRY"));
+    if (malli.length && (malli.length !== g.length || pb.size > 1)) continue;   // maliyeti eksik ya da farklı para birimi: dokunma
+    const ana = g[0], top = g.reduce((x,a)=>x+(+a.qty||0),0);
+    if (malli.length){ ana.cost = yuv(g.reduce((x,a)=>{ const c = sayi(a.cost); return x + (a.costTip==="birim" ? c*(+a.qty||0) : c); },0)); ana.costTip = "toplam"; }
+    ana.qty = top; const tarihler = g.map(a=>a.date).filter(Boolean).sort(); if (tarihler.length) ana.date = tarihler[0];
+    for (const a of g.slice(1)) sil.add(a.id); n += g.length - 1;
+  }
+  if (sil.size) S.assets = S.assets.filter(a=>!sil.has(a.id));
+  return n;
+}
+function kurumAdlari(){
+  const m = new Map(); for (const a of S.assets){ if (!a.konumNot) continue; m.set(a.konumNot, (m.get(a.konumNot)||0) + 1); }
+  const adlar = [...m.entries()].sort((x,y)=>x[0].localeCompare(y[0],"tr"));
+  if (adlar.length < 2) return "";
+  return `<div class="card"><div><b>Kurum adları</b></div><p class="muted" style="margin:4px 0 6px">Aynı yer iki farklı adla yazıldıysa birini diğerine birleştirin; kurum kartlarında ve detaylarda tek görünür.</p>
+    ${adlar.map(([ad, n]) => `<div class="row" style="gap:8px"><span style="flex:1;min-width:0">${esc(ad)} <span class="muted">· ${n} kayıt</span></span>
+      <select data-kbirles="${esc(ad)}" style="max-width:44%"><option value="">Birleştir →</option>${adlar.filter(([b])=>b!==ad).map(([b])=>`<option value="${esc(b)}">${esc(b)}</option>`).join("")}</select></div>`).join("")}</div>`;
+}
+document.addEventListener("change", async e => {
+  const sl = e.target.closest("[data-kbirles]"); if (!sl || !sl.value) return;
+  const eski = sl.dataset.kbirles, yeni = sl.value, l = S.assets.filter(a=>a.konumNot===eski);
+  if (!confirm(`"${eski}" adındaki ${l.length} kayıt "${yeni}" olarak değiştirilsin mi?`)){ sl.value = ""; return; }
+  for (const a of l) a.konumNot = yeni; const b = mukerrerBirlestir(); render(); await kaydet(); toast("Birleştirildi" + (b ? ` · ${b} mükerrer kayıt tek kayda indi` : ""));
+});
 function kivilcim(seri, yon){
   if (!seri || seri.length < 3) return "";
   const mn = Math.min(...seri), mx = Math.max(...seri), rg = (mx-mn) || 1, W=160, H=48;
@@ -2123,6 +2173,7 @@ function ayarlar(){
     <button class="btn ghost" data-act="parolaDegis">Parolayı değiştir</button>
   </div>`:""}
   ${hatirlatmaAyar()}
+  ${kurumAdlari()}
   <button class="btn ghost" data-tab="rapor">📄 Rapor oluştur · PDF paylaş</button>
   <button class="btn ghost" data-act="yedek">Şifreli yedek indir</button>
   <button class="btn ghost" data-act="cikisApp">Hesaptan çıkış</button>
@@ -2574,7 +2625,7 @@ document.addEventListener("click", async e => {
       salt = crypto.getRandomValues(new Uint8Array(16));
       key = await anahtarUret(p1, salt);
       S = {assets:[], snapshots:[]};
-      await kaydet(true); screen="app"; tab="ekle"; render(); fiyatlariAl(); dinle(); iceAktarKontrol();
+      await kaydet(true); screen="app"; tab="ekle"; render(); fiyatlariAl(); dinle(); gocler(); iceAktarKontrol();
     }
     if (act==="ac"){
       const p=document.getElementById("kp").value; if(!p) return;
@@ -2583,12 +2634,12 @@ document.addEventListener("click", async e => {
         salt = unb64(kasaDoc.salt); key = await anahtarUret(p, salt);
         S = await coz(key, kasaDoc.iv, kasaDoc.ct);
         S.assets ||= []; S.snapshots ||= [];
-        screen="app"; tab="ozet"; render(); fiyatlariAl(); dinle(); iceAktarKontrol();
+        screen="app"; tab="ozet"; render(); fiyatlariAl(); dinle(); gocler(); iceAktarKontrol();
       } catch { key=null; t.disabled=false; t.textContent="Aç"; err("Parola yanlış."); }
     }
     if (act==="fidAc"){
       t.disabled=true; t.textContent="Açılıyor…";
-      try { await faceIdAc(); screen="app"; tab="ozet"; render(); fiyatlariAl(); dinle(); iceAktarKontrol(); }
+      try { await faceIdAc(); screen="app"; tab="ozet"; render(); fiyatlariAl(); dinle(); gocler(); iceAktarKontrol(); }
       catch(ex){ key=null; anahtarHam=null; t.disabled=false; t.textContent="Face ID ile aç";
         if (ex?.name==="OperationError") { fidSil(); render(); err("Face ID kaydı geçersiz oldu. Parolayla açıp yeniden etkinleştirin."); }
         else err(fidHata(ex)); }
