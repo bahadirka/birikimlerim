@@ -216,8 +216,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 68; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 69; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:69, t:"2026-11-09", n:["Fon ve BES kodlarının yanında tam fon adı","Renkli kareler yalnız bir kurum seçildiğinde ya da \"Kareleri göster\" ile açılır","Kriptoda \"Airdrop\" kartı kaldırıldı (kayıtlar listede kalır)"]},
   {s:68, t:"2026-11-09", n:["\"Yapı Kredi Ataşehir Özel Bankacılık\" kayıtları \"Yapı Kredi Bankası Ataşehir Özel Bankacılık\" altında birleştirildi; aynı kurumdaki aynı fon/hisse tek kayda indirildi (adet ve maliyet toplandı)","Ayarlar → Kurum adları: farklı yazılmış aynı kurumu tek ada birleştirme"]},
   {s:67, t:"2026-11-09", n:["Kripto, BIST, ABD ve fonlarda renkli kareler (ısı haritası): kare büyüklüğü değer, renk günlük değişim (yeşil artış, kırmızı düşüş); \"Kâr / zarar\" moduna geçilebilir","Fiyatların ne zaman güncellendiği her ekranda","Ayarlar: bu cihazda açık alacakları her açılışta gösterme ve takvime haftalık bildirim (eşinizin telefonu için)"]},
   {s:66, t:"2026-11-09", n:["Borç/Alacak: parça ödeme — \"💵 Ödeme gir\" ile tutar, tarih ve not girin; kalan otomatik düşer, geçmiş tutulur","\"✓ Tamamı\" kalanın tamamını kapatır; \"Geri al\" son ödemeyi geri alır"]},
@@ -1834,6 +1835,13 @@ function guncellemeMetni(tip){
   const g = canli?.guncel ? Date.parse(canli.guncel) : null;
   return `${tip==="abd"?"ABD":"BIST"} fiyatları ~15 dk gecikmeli · güncellendi ${saat(g)} (${zamanOnce(g)})`;
 }
+let isiAcik = {};
+document.addEventListener("click", e => { const b = e.target.closest("[data-isiac]"); if (!b) return; e.stopPropagation(); isiAcik[b.dataset.isiac] = !isiAcik[b.dataset.isiac]; render(); }, true);
+function isiAlan(tip, l, ks){   // kurum kartı seçiliyse kareler açık; değilse düğmeyle açılır
+  const sec = kurumSec[tip] && ks.length !== l.length;
+  if (sec || isiAcik[tip]) return isiHaritasi(tip, ks) + (!sec ? `<button class="iconbtn" data-isiac="${tip}" style="margin:-4px 0 10px">Kareleri gizle</button>` : "");
+  return `<button class="btn ghost" data-isiac="${tip}" style="margin:0 0 10px">🟩🟥 Kareleri göster</button>`;
+}
 function isiHaritasi(tip, l){
   const m = new Map();
   for (const a of l){ const k = String(a.symbol||"").toUpperCase() || a.id; if (!m.has(k)) m.set(k, []); m.get(k).push(a); }
@@ -2203,6 +2211,7 @@ function etiket(a){
   if (isBA(a)) return a.kisi || "";
   if (a.hesap) return "BES · "+(a.kisi||"");
   if ((a.type==="bist"||a.type==="abd") && canli?.adlar?.[a.type]?.[String(a.symbol||"").toUpperCase()]) return String(a.symbol).toUpperCase()+" · "+canli.adlar[a.type][String(a.symbol).toUpperCase()];
+  if ((a.type==="fon"||a.type==="bes") && a.symbol && canli?.fon?.[String(a.symbol).toUpperCase()]?.ad) return String(a.symbol).toUpperCase()+" · "+canli.fon[String(a.symbol).toUpperCase()].ad;
   if (a.type==="mevduat") return (a.banka||"Vadeli") + (a.cur&&a.cur!=="TRY"?" · "+a.cur:"");
   return String(a.symbol||"").toUpperCase();
 }
@@ -2378,8 +2387,8 @@ function kurumHesap(tip, l){
 }
 function kurumListe(tip, l){ const s = kurumSec[tip]; return s && l.some(a=>kurumAdi(a)===s) ? l.filter(a=>kurumAdi(a)===s) : l; }
 function kurumOzet(tip, l){
-  const kurumlar = [...new Set(l.map(kurumAdi))], sec = kurumSec[tip] && kurumlar.includes(kurumSec[tip]) ? kurumSec[tip] : "";
-  if (kurumlar.length < 2) return "";
+  const kurumlar = [...new Set(l.map(kurumAdi))].filter(b => !/airdrop/i.test(b)), sec = kurumSec[tip] && kurumlar.includes(kurumSec[tip]) ? kurumSec[tip] : "";
+  if (kurumlar.length < 2 && !sec) return "";
   const birim = tip==="kripto" ? "coin" : tip==="fon" ? "fon" : "hisse";
   const tekil = a => (a.type==="bist"||a.type==="abd"||a.type==="fon"||a.type==="kripto") ? String(a.symbol||"").toUpperCase() : a.id;
   const satirlar = kurumlar.map(b => { const ll = l.filter(a=>kurumAdi(a)===b); return {b, h: kurumHesap(tip, ll), say: new Set(ll.map(tekil)).size}; }).sort((x,y)=>y.h.v-x.h.v);
@@ -2405,7 +2414,7 @@ function varliklar(){
     const l = S.assets.filter(a=>a.type===k); if (!l.length) return "";
     const usdT = (k==="kripto"||k==="abd") ? l.reduce((x,a)=>x+(usdDeger(a)||0),0) : 0;
     const ks = KURUM_TIPLER.includes(k) ? kurumListe(k, l) : l;
-    return `<h2>${TYPES[k].ad} · ${para(toplam(l).v)}${usdT?` · ${para(usdT, fUSD)}`:""}</h2>${KURUM_TIPLER.includes(k) ? kurumOzet(k, l) : ""}${filtre===k && KURUM_TIPLER.includes(k) ? isiHaritasi(k, ks) : ""}<div class="card">${siraliListe(grupla(ks)).map(gSatir).join("")}</div>${k==="bist"?bistOzet(ks):""}`;
+    return `<h2>${TYPES[k].ad} · ${para(toplam(l).v)}${usdT?` · ${para(usdT, fUSD)}`:""}</h2>${KURUM_TIPLER.includes(k) ? kurumOzet(k, l) : ""}${filtre===k && KURUM_TIPLER.includes(k) ? isiAlan(k, l, ks) : ""}<div class="card">${siraliListe(grupla(ks)).map(gSatir).join("")}</div>${k==="bist"?bistOzet(ks):""}`;
   }).join("");
 }
 /* BIST endeks üyeliği — Ekim–Aralık 2026 dönemi (her çeyrek güncellenir) */
