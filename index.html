@@ -216,8 +216,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 69; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 70; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:70, t:"2026-11-09", n:["Günlük kâr/zarar tutar olarak: fon, hisse ve kripto satırlarında, detayda, kurum kartlarında (\"Bugün +₺…\") ve grup başlığında"]},
   {s:69, t:"2026-11-09", n:["Fon ve BES kodlarının yanında tam fon adı","Renkli kareler yalnız bir kurum seçildiğinde ya da \"Kareleri göster\" ile açılır","Kriptoda \"Airdrop\" kartı kaldırıldı (kayıtlar listede kalır)"]},
   {s:68, t:"2026-11-09", n:["\"Yapı Kredi Ataşehir Özel Bankacılık\" kayıtları \"Yapı Kredi Bankası Ataşehir Özel Bankacılık\" altında birleştirildi; aynı kurumdaki aynı fon/hisse tek kayda indirildi (adet ve maliyet toplandı)","Ayarlar → Kurum adları: farklı yazılmış aynı kurumu tek ada birleştirme"]},
   {s:67, t:"2026-11-09", n:["Kripto, BIST, ABD ve fonlarda renkli kareler (ısı haritası): kare büyüklüğü değer, renk günlük değişim (yeşil artış, kırmızı düşüş); \"Kâr / zarar\" moduna geçilebilir","Fiyatların ne zaman güncellendiği her ekranda","Ayarlar: bu cihazda açık alacakları her açılışta gösterme ve takvime haftalık bildirim (eşinizin telefonu için)"]},
@@ -2235,7 +2236,7 @@ function satir(a){
   const cf = canliFiyat(a), elle = !cf && !a.hesap && ["bist","abd","fon","bes"].includes(a.type);
   return `<div class="row tap" data-detay="${esc(a.id)}">
     <div><div>${esc(etiket(a))}${a.konum==="kasa"?'<span class="tag">kasa</span>':""}</div>
-    <div class="muted">${miktar(a)}${cf?` · <span class="pos">canlı</span> ${a.type==="abd"?"$"+fN.format(cf.p):fN.format(cf.p)+" TL"}${cf.ch!=null?` <span class="${cf.ch>=0?"pos":"neg"}">${cf.ch>=0?"+":""}${cf.ch}%</span>`:""}${a.type==="fon"||a.type==="bes"?" · "+esc(cf.t||""):""}`:""}${elle?` · elle fiyat${a.fiyatCur&&a.fiyatCur!=="TRY"?" ("+a.fiyatCur+")":""}${a.priceDate?" · "+esc(a.priceDate):""}`:""}${a.konum==="borsa"&&a.borsaAd?" · "+esc(a.borsaAd):""}${a.konumNot?" · "+esc(a.konumNot):""}</div></div>
+    <div class="muted">${miktar(a)}${cf?` · <span class="pos">canlı</span> ${a.type==="abd"?"$"+fN.format(cf.p):fN.format(cf.p)+" TL"}${cf.ch!=null?` <span class="${cf.ch>=0?"pos":"neg"}">${cf.ch>=0?"+":""}${cf.ch}%${(()=>{ const g = gunlukTL(a); return g!=null && !gizli ? ` (${g>=0?"+":"−"}${para(Math.abs(g))})` : ""; })()}</span>`:""}${a.type==="fon"||a.type==="bes"?" · "+esc(cf.t||""):""}`:""}${elle?` · elle fiyat${a.fiyatCur&&a.fiyatCur!=="TRY"?" ("+a.fiyatCur+")":""}${a.priceDate?" · "+esc(a.priceDate):""}`:""}${a.konum==="borsa"&&a.borsaAd?" · "+esc(a.borsaAd):""}${a.konumNot?" · "+esc(a.konumNot):""}</div></div>
     <div class="r"><div>${para(d)}</div>${usdKarsilik(a, d)}${(()=>{ if (!(a.tutarCur&&a.tutarCur!=="TRY"&&d!=null)) return ""; const k = (cf && tcmbKur(cf.t, a.tutarCur)) || kurTL(a.tutarCur); return k ? `<div class="muted">≈ ${para(d/k, a.tutarCur==="USD"?fUSD:fEUR)}</div>` : ""; })()}${kz!=null?(false?``:`<div class="${kz>=0?"pos":"neg"}" style="font-size:13px">${gizli?"":yuzde(kz,2)+(kz>=0?" kâr":" zarar")}</div><div class="${kz>=0?"pos":"neg"}" style="font-size:12px">${gizli?"••••":(kh.tutar>=0?"+":"−")+khPara(kh)}</div>${kh.etiket?`<div class="muted" style="font-size:11px">${kh.etiket}</div>`:""}`):""}</div>
   </div>`;
 }
@@ -2325,7 +2326,7 @@ function detay(){
   } else {
     ek("Miktar", `${fN.format(q)} ${birim}`);
     ek("Güncel fiyat", birimFiyat==null ? "—" : (a.type==="abd" ? fUSD2.format(birimFiyat/(kU||1)) : a.type==="kripto" && prices.crypto[cgId(a.symbol)]?.usd ? fUSD2.format(prices.crypto[cgId(a.symbol)].usd) : fTL2n.format(birimFiyat)) + (cf ? " · canlı" : " · elle"));
-    if (cf?.ch!=null) ek("Günlük değişim", yuzde(cf.ch), cf.ch>=0?"pos":"neg");
+    if (cf?.ch!=null){ const g = gunlukTL(a); ek("Günlük değişim", `${yuzde(cf.ch)}${g!=null?` · ${g>=0?"+":"−"}${para(Math.abs(g))}`:""}`, cf.ch>=0?"pos":"neg"); }
     else if (a.type==="kripto" && prices.crypto[cgId(a.symbol)]?.ch!=null) { const c = prices.crypto[cgId(a.symbol)].ch; ek("24 saatlik değişim", yuzde(c), c>=0?"pos":"neg"); }
     ek("Ortalama maliyet", ortMaliyetMetni(a,q) || "girilmemiş", mt==null?"muted":"");
     ek("Toplam maliyet", mt==null ? null : a.type==="abd" && maliyetUSD(a)!=null ? para(maliyetUSD(a), fUSD2) : para(mt));
@@ -2378,6 +2379,13 @@ document.addEventListener("click", e => { const b = e.target.closest("[data-kuru
   const [tip, ad] = b.dataset.kurum.split("|"); kurumSec[tip] = kurumSec[tip]===ad ? "" : ad;
   try { localStorage.setItem("kurumSec", JSON.stringify(kurumSec)); } catch {} render(); }, true);
 const kurumAdi = a => kurumAd(a) || "Diğer";
+/* Günlük kâr/zarar tutarı (TL): bugünkü değer × değişim ÷ (100 + değişim) */
+function gunlukTL(a){
+  const d = degerTL(a); if (!d) return null;
+  const ch = a.type==="kripto" ? prices.crypto[cgId(a.symbol)]?.ch : canliFiyat(a)?.ch;
+  return ch==null ? null : d * ch / (100 + +ch);
+}
+const gunlukTop = l => { let t = 0, var_ = false; for (const a of l){ const g = gunlukTL(a); if (g!=null){ t += g; var_ = true; } } return var_ ? t : null; };
 function kurumHesap(tip, l){
   const usd = tip==="abd" || tip==="kripto"; let v = 0, vU = 0, mal = 0, malDeg = 0, n = 0;
   for (const a of l){ const d = degerTL(a); n++; if (d!=null) v += d;
@@ -2396,7 +2404,7 @@ function kurumOzet(tip, l){
   const kz = h => h.kz==null ? `<span class="muted">maliyet yok</span>`
     : `<span class="${h.kz>=0?"pos":"neg"}">${gizli?"":yuzde(h.oran,2)+" · "}${gizli?"••••":(h.kz>=0?"+":"−")+(h.usd ? fUSD.format(Math.abs(h.kz)) : para(Math.abs(h.kz)))}</span>`;
   const kart = x => `<div class="kb-kart${sec===x.b?" on":""}" data-kurum="${esc(tip+"|"+x.b)}"><div class="kb-ad">${esc(x.b)} <span class="muted">· ${x.say} ${birim}</span></div>
-    <div class="kb-deger">${para(x.h.v)}</div><div class="muted" style="font-size:12px">${x.h.usd ? (gizli?"••••":fUSD.format(x.h.vU)) : `grubun %${fN2.format(x.h.v/top*100)}'i`}</div><div style="font-size:13px;font-weight:600;margin-top:2px">${kz(x.h)}</div></div>`;
+    <div class="kb-deger">${para(x.h.v)}</div><div class="muted" style="font-size:12px">${x.h.usd ? (gizli?"••••":fUSD.format(x.h.vU)) : `grubun %${fN2.format(x.h.v/top*100)}'i`}</div><div style="font-size:13px;font-weight:600;margin-top:2px">${kz(x.h)}</div>${(()=>{ const g = gunlukTop(l.filter(a=>kurumAdi(a)===x.b)); return g==null ? "" : `<div class="muted" style="font-size:12px;margin-top:2px">Bugün <span class="${g>=0?"pos":"neg"}">${gizli?"••••":(g>=0?"+":"−")+para(Math.abs(g))}</span></div>`; })()}</div>`;
   return `<div class="kb-izgara">${satirlar.map(kart).join("")}</div>
     ${sec ? `<div class="row" style="padding:2px 2px 8px;border:0"><span class="muted">Yalnız <b>${esc(sec)}</b> gösteriliyor</span><button class="iconbtn" data-kurum="${esc(tip+"|"+sec)}" style="margin:0">Tüm kurumlar</button></div>`
       : `<div class="muted" style="font-size:12px;padding:0 2px 8px">Toplam kâr/zarar: ${kz(hepsi)} · Bir ${tip==="kripto"?"borsaya":"kuruma"} dokunun, yalnız onun ${tip==="kripto"?"coinleri":"varlıkları"} listelensin.</div>`}`;
@@ -2413,8 +2421,9 @@ function varliklar(){
   return ust + sir + Object.keys(TYPES).filter(k=>k!=="alacak"&&k!=="borc"&&(!filtre||k===filtre)).map(k=>{
     const l = S.assets.filter(a=>a.type===k); if (!l.length) return "";
     const usdT = (k==="kripto"||k==="abd") ? l.reduce((x,a)=>x+(usdDeger(a)||0),0) : 0;
-    const ks = KURUM_TIPLER.includes(k) ? kurumListe(k, l) : l;
-    return `<h2>${TYPES[k].ad} · ${para(toplam(l).v)}${usdT?` · ${para(usdT, fUSD)}`:""}</h2>${KURUM_TIPLER.includes(k) ? kurumOzet(k, l) : ""}${filtre===k && KURUM_TIPLER.includes(k) ? isiAlan(k, l, ks) : ""}<div class="card">${siraliListe(grupla(ks)).map(gSatir).join("")}</div>${k==="bist"?bistOzet(ks):""}`;
+    const ks = KURUM_TIPLER.includes(k) ? kurumListe(k, l) : l, gT = KURUM_TIPLER.includes(k) || k==="bes" ? gunlukTop(ks) : null;
+    const bugunSatir = gT==null ? "" : `<div class="muted" style="font-size:13px;margin:-4px 2px 8px">Bugün: <b class="${gT>=0?"pos":"neg"}">${gizli?"••••":(gT>=0?"+":"−")+para(Math.abs(gT))}</b>${(()=>{ const v = toplam(ks).v; return v && !gizli ? ` <span class="${gT>=0?"pos":"neg"}">(${yuzde(gT/(v-gT)*100,2)})</span>` : ""; })()}</div>`;
+    return `<h2>${TYPES[k].ad} · ${para(toplam(l).v)}${usdT?` · ${para(usdT, fUSD)}`:""}</h2>${bugunSatir}${KURUM_TIPLER.includes(k) ? kurumOzet(k, l) : ""}${filtre===k && KURUM_TIPLER.includes(k) ? isiAlan(k, l, ks) : ""}<div class="card">${siraliListe(grupla(ks)).map(gSatir).join("")}</div>${k==="bist"?bistOzet(ks):""}`;
   }).join("");
 }
 /* BIST endeks üyeliği — Ekim–Aralık 2026 dönemi (her çeyrek güncellenir) */
