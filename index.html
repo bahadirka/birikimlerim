@@ -216,8 +216,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 71; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 72; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:72, t:"2026-11-09", n:["Kareler: toplam değer yerine o anki değişim tutarı (kripto ve ABD'de $); Kâr/zarar modunda kâr/zarar tutarı","USD seçiliyken dolar karşılığı satırlarda iki kez yazılmaz"]},
   {s:71, t:"2026-11-09", n:["Ayarlar → \"🔔 Bildirimleri aç\": Birikimlerim artık telefonunuza kendi adıyla bildirim gönderebilir; düğme açık alacaklarınızla bir deneme bildirimi yollar"]},
   {s:70, t:"2026-11-09", n:["Günlük kâr/zarar tutar olarak: fon, hisse ve kripto satırlarında, detayda, kurum kartlarında (\"Bugün +₺…\") ve grup başlığında"]},
   {s:69, t:"2026-11-09", n:["Fon ve BES kodlarının yanında tam fon adı","Renkli kareler yalnız bir kurum seçildiğinde ya da \"Kareleri göster\" ile açılır","Kriptoda \"Airdrop\" kartı kaldırıldı (kayıtlar listede kalır)"]},
@@ -559,6 +560,7 @@ function usdDeger(a){
 }
 function usdKarsilik(a, d){
   const u = usdDeger(a); if (u==null) return "";
+  if (gosterPB==="USD"){ const birim = a.type==="kripto" ? prices.crypto[cgId(a.symbol)]?.usd : null; return birim ? `<div class="muted" style="font-size:11px">1 ${esc(String(a.symbol||"").toUpperCase())} = ${fUSD2.format(birim)}</div>` : ""; }
   const birim = a.type==="kripto" ? prices.crypto[cgId(a.symbol)]?.usd : null;
   return `<div style="font-size:14px;font-weight:600">${para(u, fUSD2)}</div>${birim?`<div class="muted" style="font-size:11px">1 ${esc(String(a.symbol||"").toUpperCase())} = ${fUSD2.format(birim)}</div>`:""}`;
 }
@@ -1844,6 +1846,7 @@ function isiAlan(tip, l, ks){   // kurum kartı seçiliyse kareler açık; deği
   if (sec || isiAcik[tip]) return isiHaritasi(tip, ks) + (!sec ? `<button class="iconbtn" data-isiac="${tip}" style="margin:-4px 0 10px">Kareleri gizle</button>` : "");
   return `<button class="btn ghost" data-isiac="${tip}" style="margin:0 0 10px">🟩🟥 Kareleri göster</button>`;
 }
+const khTLtut = kh => kh.tl || kh.pb==="TRY" ? kh.tutar : kh.tutar*(kurTL(kh.pb)||0);
 function isiHaritasi(tip, l){
   const m = new Map();
   for (const a of l){ const k = String(a.symbol||"").toUpperCase() || a.id; if (!m.has(k)) m.set(k, []); m.get(k).push(a); }
@@ -1852,7 +1855,13 @@ function isiHaritasi(tip, l){
     const ch = tip==="kripto" ? (prices.crypto[cgId(a0.symbol)]?.chU ?? prices.crypto[cgId(a0.symbol)]?.ch) : canliFiyat(a0)?.ch;
     const h = g.length > 1 ? gHesap({grup:g, anahtar:k}) : null, kh = g.length===1 ? kzHesap(a0) : null;
     const kz = h ? (h.oranU ?? h.oran) : kh?.oran ?? null;
-    return {k, v, ch: ch==null ? null : +ch, kz, id: a0.id, n: g.length};
+    const usdT = tip==="kripto" || tip==="abd";
+    // o anki değişim tutarı: dolar bazlılar için $ (kriptoda 24 saatlik $ değişimi), diğerleri TL
+    const gun = ch==null ? null : usdT
+      ? g.reduce((x,a)=>{ const u = usdDeger(a); const c = tip==="kripto" ? prices.crypto[cgId(a.symbol)]?.chU ?? ch : ch; return x + (u ? u*c/(100+ +c) : 0); }, 0)
+      : g.reduce((x,a)=>x+(gunlukTL(a)||0),0);
+    const kzT = h ? (usdT ? h.kzU : h.kz) : kh ? (usdT ? (kh.pb==="USD" ? kh.tutar : (kh.tl ? kh.tutar : kh.tutar*(kurTL(kh.pb)||0))/(prices.fx.USD||1)) : khTLtut(kh)) : null;
+    return {k, v, ch: ch==null ? null : +ch, kz, id: a0.id, n: g.length, gun, kzT, usdT};
   }).filter(o=>o.v>0).sort((x,y)=>y.v-x.v);
   if (!ogeler.length) return "";
   if (ogeler.length > 24){ const dig = ogeler.slice(23); ogeler = ogeler.slice(0,23).concat({k:`+${dig.length} diğer`, v:dig.reduce((x,o)=>x+o.v,0), ch:null, kz:null, id:null}); }
@@ -1862,7 +1871,7 @@ function isiHaritasi(tip, l){
   const yukselen = ogeler.filter(o=>(deger(o)??0)>0).length, dusen = ogeler.filter(o=>(deger(o)??0)<0).length;
   const kutular = kareler.map(o => { const v = deger(o), alan = o.w*o.h/(W*H), buyuk = alan > 0.045, orta = alan > 0.015;
     return `<div class="isi-kare"${o.id?` data-detay="${esc(o.id)}"`:""} style="left:${(o.x/W*100).toFixed(3)}%;top:${(o.y/H*100).toFixed(3)}%;width:${(o.w/W*100).toFixed(3)}%;height:${(o.h/H*100).toFixed(3)}%;background:${isiRenk(v, olcek)}">
-      <div class="isi-ic"><b style="font-size:${buyuk?15:orta?12:10}px">${esc(o.k)}</b>${orta?`<span style="font-size:${buyuk?14:11}px">${v==null?"—":yuzde(v, buyuk?2:1)}</span>`:""}${buyuk&&!gizli?`<small>${para(o.v)}</small>`:""}</div></div>`; }).join("");
+      <div class="isi-ic"><b style="font-size:${buyuk?15:orta?12:10}px">${esc(o.k)}</b>${orta?`<span style="font-size:${buyuk?14:11}px">${v==null?"—":yuzde(v, buyuk?2:1)}</span>`:""}${buyuk&&!gizli?(()=>{ const t = isiMod==="kz" ? o.kzT : o.gun; if (t==null) return ""; const f = Math.abs(t); return `<small>${t>=0?"+":"−"}${o.usdT ? fUSD.format(f) : para(f)}</small>`; })():""}</div></div>`; }).join("");
   return `<div class="card isi-kart">
     <div class="isi-ust"><div class="seg">${[["gun","Bugün"],["kz","Kâr / zarar"]].map(([k,t])=>`<button data-isimod="${k}" class="${isiMod===k?"on":""}">${t}</button>`).join("")}</div>
       <span class="muted" style="font-size:12px"><span class="pos">▲ ${yukselen}</span> · <span class="neg">▼ ${dusen}</span></span></div>
