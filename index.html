@@ -216,8 +216,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 70; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 71; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:71, t:"2026-11-09", n:["Ayarlar → \"🔔 Bildirimleri aç\": Birikimlerim artık telefonunuza kendi adıyla bildirim gönderebilir; düğme açık alacaklarınızla bir deneme bildirimi yollar"]},
   {s:70, t:"2026-11-09", n:["Günlük kâr/zarar tutar olarak: fon, hisse ve kripto satırlarında, detayda, kurum kartlarında (\"Bugün +₺…\") ve grup başlığında"]},
   {s:69, t:"2026-11-09", n:["Fon ve BES kodlarının yanında tam fon adı","Renkli kareler yalnız bir kurum seçildiğinde ya da \"Kareleri göster\" ile açılır","Kriptoda \"Airdrop\" kartı kaldırıldı (kayıtlar listede kalır)"]},
   {s:68, t:"2026-11-09", n:["\"Yapı Kredi Ataşehir Özel Bankacılık\" kayıtları \"Yapı Kredi Bankası Ataşehir Özel Bankacılık\" altında birleştirildi; aynı kurumdaki aynı fon/hisse tek kayda indirildi (adet ve maliyet toplandı)","Ayarlar → Kurum adları: farklı yazılmış aynı kurumu tek ada birleştirme"]},
@@ -1878,10 +1879,24 @@ function takvimHatirlatma(){
   const u = URL.createObjectURL(new Blob([ics], {type:"text/calendar"})), l = document.createElement("a");
   l.href = u; l.download = "birikimlerim-alacak-hatirlatma.ics"; l.click(); setTimeout(()=>URL.revokeObjectURL(u), 60000);
 }
+/* Uygulamanın kendi bildirimleri (service worker) */
+async function swKayit(){ if (!("serviceWorker" in navigator)) return null; try { return await navigator.serviceWorker.register("sw.js"); } catch { return null; } }
+async function denemeBildirim(){
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent), kurulu = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+  if (!("Notification" in window) || !("serviceWorker" in navigator)) { toast(ios && !kurulu ? "iPhone'da bildirim için: Safari → Paylaş → Ana Ekrana Ekle, sonra uygulamayı oradan açın" : "Bu tarayıcı bildirimleri desteklemiyor"); return; }
+  const izin = Notification.permission==="granted" ? "granted" : await Notification.requestPermission();
+  if (izin!=="granted") { toast("Bildirim izni verilmedi. Telefon ayarlarından Birikimlerim'e izin verebilirsiniz."); return; }
+  await swKayit(); const reg = await navigator.serviceWorker.ready;
+  const acik = (S?.assets||[]).filter(a=>a.type==="alacak" && !a.odendi), top = acik.reduce((x,a)=>x+(degerTL(a)||0),0);
+  const govde = acik.length ? `${acik.length} açık alacak · toplam ${para(top)}. Tahsil ettiklerinizi Borç/Alacak'ta "✓ Ödendi" ile kapatın.` : "Açık alacağınız yok 👍";
+  await reg.showNotification("💰 Birikimlerim · deneme", { body: govde, icon: "icon-192.png", badge: "icon-192.png", tag: "deneme", data: { url: "./" } });
+  toast("Deneme bildirimi gönderildi");
+}
 function hatirlatmaAyar(){
   return `<div class="card"><div><b>Bu cihazda hatırlatmalar</b></div>
     <p class="muted" style="margin:4px 0 8px">Her telefon kendi seçimini saklar; eşinizin telefonunda ayrıca ayarlanabilir.</p>
     <label class="rp-k"><input type="checkbox" data-act="alacakHerZaman" ${alacakHerZaman()?"checked":""}><span style="flex:1">Açık alacakları her açılışta ekranın üstünde göster<br><span class="muted" style="font-size:12px">Kapalıyken: pazartesileri ve vadesi geçince</span></span></label>
+    <button class="btn ghost" data-act="bildirimDene">🔔 Bildirimleri aç · deneme bildirimi gönder</button>
     <button class="btn ghost" data-act="takvimHatirlat">📅 Takvime haftalık bildirim ekle (Pazartesi 10:00)</button>
     <p class="muted" style="font-size:12px;margin:4px 0 0">iPhone takvimine her pazartesi 10:00'da çalan bir hatırlatma ekler; bildirime dokununca uygulama açılır.</p></div>`;
 }
@@ -2693,6 +2708,7 @@ document.addEventListener("click", async e => {
     if (act==="detayPerf") fonPerfAc(t.dataset.k);
     if (act==="detaySil"){ const a = S.assets.find(x=>x.id===detayId); if (a && confirm(`${etiket(a)} (${kurumAd(a)}) silinsin mi?`)){ S.assets = S.assets.filter(x=>x.id!==detayId); detayId=null; tab="varlik"; render(); await kaydet(); } }
     if (act==="alacakHerZaman"){ lsSet("alacakHerZaman", alacakHerZaman() ? "0" : "1"); toast(alacakHerZaman() ? "Açık alacaklar her açılışta gösterilecek" : "Yalnız pazartesi ve vadesi geçince"); render(); return; }
+    if (act==="bildirimDene"){ denemeBildirim(); return; }
     if (act==="takvimHatirlat"){ takvimHatirlatma(); return; }
     if (act==="kilitle") kilitle();
     if (act==="gizle"){ gizli=!gizli; lsSet("gizle",gizli?"1":"0"); render(); }
@@ -2839,7 +2855,7 @@ function surumBandi(j){
   d.innerHTML = `<div style="flex:1"><b>Yeni sürüm hazır (${esc(j.surum)})</b>${j.not?`<div style="font-size:13px;opacity:.9">${esc(j.not)}</div>`:""}</div><button data-act="guncelle" style="background:#fff;color:#000;border:0;border-radius:10px;padding:9px 12px;font:inherit;font-weight:600">Güncelle</button>`;
   document.body.appendChild(d);
 }
-surumKontrol();
+surumKontrol(); swKayit();
 yenilikleriGoster();
 setInterval(surumKontrol, 5*60*1000);
 document.addEventListener("visibilitychange", ()=>{ if (!document.hidden) surumKontrol(); });
