@@ -148,6 +148,14 @@ main a{color:var(--acc)}
 .bugun-net{display:flex;align-items:center;gap:8px;margin:2px 0 4px;font-size:15px}
 .bugun-net span:first-child{color:var(--muted);font-size:13px}
 .bugun-oran{font-weight:600;font-size:13px;padding:2px 8px;border-radius:999px;background:color-mix(in srgb,currentColor 12%,transparent)}
+.bugun-net.tap{cursor:pointer}
+.bugun-dag{margin:8px 0 6px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--muted) 7%,transparent)}
+.bd-satir{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:14px}
+.bd-ad{width:96px;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bd-cubuk{position:relative;flex:1;height:14px}
+.bd-cubuk .fp-bar{top:1px;height:12px}
+.bd-tutar{flex:none;text-align:right;min-width:70px}
+.bd-oran{flex:none;width:52px;text-align:right;font-size:12px}
 .sirala{display:flex;gap:6px;align-items:center;overflow-x:auto;scrollbar-width:none;margin:0 -16px 4px;padding:2px 16px 6px}
 .sirala::-webkit-scrollbar{display:none}
 .sirala span{flex:none;font-size:12px}
@@ -219,8 +227,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 74; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 75; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:75, t:"2026-11-12", n:["Özet: \"Bugün\" satırına dokununca bugünkü kâr/zararın dağılımı — varlık türüne göre tutar ve yüzde, en çok kazandıran ve kaybettiren 5 kalem"]},
   {s:74, t:"2026-11-11", n:["Özet: net varlığın altında bugünkü kâr/zarar tutarı ve yüzdesi (hisse, fon, kripto, altın, gümüş, döviz ve BES)"]},
   {s:73, t:"2026-11-09", n:["Haftalık BES hatırlatması artık uygulamada: son ekran görüntüsünün üzerinden 7 gün geçince Özet'in üstünde AgeSA → Birikimlerim → Sevdiklerim ve Kendim ekranlarını hatırlatan uyarı"]},
   {s:72, t:"2026-11-09", n:["Kareler: toplam değer yerine o anki değişim tutarı (kripto ve ABD'de $); Kâr/zarar modunda kâr/zarar tutarı","USD seçiliyken dolar karşılığı satırlarda iki kez yazılmaz"]},
@@ -2038,7 +2047,7 @@ function ozet(){
     <div class="big">${pbPara(t.net)}</div>
     ${(()=>{ const g = gunlukTop(S.assets.filter(a=>!isBA(a))); if (g==null) return "";
       const onceki = t.varlik - g, o = onceki ? g/onceki*100 : 0;
-      return `<div class="bugun-net ${g>=0?"pos":"neg"}"><span>Bugün</span><b>${gizli?"••••":(g>=0?"+":"−")+pbPara(Math.abs(g))}</b><span class="bugun-oran">${g>=0?"▲":"▼"} ${yuzde(o,2)}</span></div>`; })()}
+      return `<div class="bugun-net tap ${g>=0?"pos":"neg"}" data-act="bugunAc"><span>Bugün</span><b>${gizli?"••••":(g>=0?"+":"−")+pbPara(Math.abs(g))}</b><span class="bugun-oran">${g>=0?"▲":"▼"} ${yuzde(o,2)}</span><span class="muted" style="font-size:12px">${bugunAcik?"▾":"▸ dağılım"}</span></div>${bugunAcik ? bugunDagilim(g) : ""}`; })()}
     <div class="muted">${Object.keys(PB).filter(k=>k!==gosterPB).map(k=>"≈ "+pbPara(t.net,k)).join(" · ")}</div>
     ${(t.alacak||t.borc)?`<div class="muted">Varlıklar ${pbPara(t.varlik)} · Alacak <span class="pos">+${pbPara(t.alacak)}</span> · Borç <span class="neg">−${pbPara(t.borc)}</span></div>`:""}
     <div class="muted">
@@ -2432,6 +2441,30 @@ function gunlukTL(a){
   else ch = canliFiyat(a)?.ch;
   return ch==null ? null : d * ch / (100 + +ch);
 }
+/* Bugünkü kâr/zararın kaynakları: varlık türü bazında ve en çok etkileyen kalemler */
+let bugunAcik = false;
+function bugunDagilim(top){
+  const l = S.assets.filter(a=>!isBA(a)), tur = {}, kalem = new Map();
+  for (const a of l){ const g = gunlukTL(a); if (g==null || Math.abs(g) < 0.5) continue;
+    const k = a.hesap ? "bes" : a.type; tur[k] = (tur[k]||0) + g;
+    const ad = a.hesap ? etiket(a) : a.type==="altin" ? "Altın · "+(ALTIN[a.unit||"gram24"]||"") : a.type==="gumus" ? "Gümüş" : a.type==="nakit" ? "Nakit · "+(a.cur||"TRY") : String(a.symbol||etiket(a)).toUpperCase();
+    const key = a.type+"|"+ad, o = kalem.get(key) || {ad, tip:a.type, g:0, v:0, id:a.id}; o.g += g; o.v += degerTL(a)||0; kalem.set(key, o); }
+  const turlar = Object.entries(tur).sort((x,y)=>Math.abs(y[1])-Math.abs(x[1]));
+  if (!turlar.length) return "";
+  const mx = Math.max(...turlar.map(x=>Math.abs(x[1])));
+  const P = v => gizli ? "••••" : (v>=0?"+":"−")+pbPara(Math.abs(v));
+  const satir = (renk, ad, g, oran, extra="") => `<div class="bd-satir"${extra}><span class="dot" style="background:${renk}"></span><span class="bd-ad">${esc(ad)}</span>
+    <div class="bd-cubuk"><span class="fp-sifir"></span><span class="fp-bar ${g>=0?"pos":"neg"}" style="${g>=0?"left:50%":"right:50%"};width:${(Math.abs(g)/mx*50).toFixed(1)}%"></span></div>
+    <b class="bd-tutar ${g>=0?"pos":"neg"}">${P(g)}</b>${oran!=null?`<span class="muted bd-oran">${yuzde(oran,1)}</span>`:""}</div>`;
+  const ks = [...kalem.values()], art = ks.filter(x=>x.g>0).sort((a,b)=>b.g-a.g).slice(0,5), azal = ks.filter(x=>x.g<0).sort((a,b)=>a.g-b.g).slice(0,5);
+  const kSatir = o => `<div class="row tap" data-detay="${esc(o.id)}" style="padding:7px 0"><span>${esc(o.ad)} <span class="muted" style="font-size:12px">· ${TYPES[o.tip]?.ad||""}</span></span><b class="${o.g>=0?"pos":"neg"}">${P(o.g)} <span class="muted" style="font-weight:400;font-size:12px">${yuzde(o.v-o.g ? o.g/(o.v-o.g)*100 : 0,1)}</span></b></div>`;
+  return `<div class="bugun-dag">
+    <div class="muted" style="font-size:12px;margin-bottom:4px">Varlık türüne göre</div>
+    ${turlar.map(([k,g]) => { const v = l.filter(a=>(a.hesap?"bes":a.type)===k).reduce((x,a)=>x+(degerTL(a)||0),0); return satir(renkOf(k), TYPES[k]?.ad||k, g, v-g ? g/(v-g)*100 : null); }).join("")}
+    ${art.length?`<div class="muted" style="font-size:12px;margin:10px 0 2px">En çok kazandıran</div>${art.map(kSatir).join("")}`:""}
+    ${azal.length?`<div class="muted" style="font-size:12px;margin:10px 0 2px">En çok kaybettiren</div>${azal.map(kSatir).join("")}`:""}
+    <p class="muted" style="font-size:11px;margin:8px 0 0">Bugünkü değişim: hisse ~15 dk gecikmeli, fonlar son TEFAS günü, kripto son 24 saat, altın/döviz serbest piyasa.</p></div>`;
+}
 const gunlukTop = l => { let t = 0, var_ = false; for (const a of l){ const g = gunlukTL(a); if (g!=null){ t += g; var_ = true; } } return var_ ? t : null; };
 function kurumHesap(tip, l){
   const usd = tip==="abd" || tip==="kripto"; let v = 0, vU = 0, mal = 0, malDeg = 0, n = 0;
@@ -2742,6 +2775,7 @@ document.addEventListener("click", async e => {
     if (act==="alacakHerZaman"){ lsSet("alacakHerZaman", alacakHerZaman() ? "0" : "1"); toast(alacakHerZaman() ? "Açık alacaklar her açılışta gösterilecek" : "Yalnız pazartesi ve vadesi geçince"); render(); return; }
     if (act==="bildirimDene"){ denemeBildirim(); return; }
     if (act==="takvimHatirlat"){ takvimHatirlatma(); return; }
+    if (act==="bugunAc"){ bugunAcik = !bugunAcik; render(); return; }
     if (act==="kilitle") kilitle();
     if (act==="gizle"){ gizli=!gizli; lsSet("gizle",gizli?"1":"0"); render(); }
     if (act==="yenile") fiyatlariAl();
