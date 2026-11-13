@@ -227,8 +227,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 75; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 76; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:76, t:"2026-11-13", n:["Döviz fonlarında günlük değişim, bankadaki gibi fonun kendi para biriminde (USD/EUR; TCMB kuruyla) — USD/EUR seçiliyken satır, detay, kareler ve Bugün toplamında"]},
   {s:75, t:"2026-11-12", n:["Özet: \"Bugün\" satırına dokununca bugünkü kâr/zararın dağılımı — varlık türüne göre tutar ve yüzde, en çok kazandıran ve kaybettiren 5 kalem"]},
   {s:74, t:"2026-11-11", n:["Özet: net varlığın altında bugünkü kâr/zarar tutarı ve yüzdesi (hisse, fon, kripto, altın, gümüş, döviz ve BES)"]},
   {s:73, t:"2026-11-09", n:["Haftalık BES hatırlatması artık uygulamada: son ekran görüntüsünün üzerinden 7 gün geçince Özet'in üstünde AgeSA → Birikimlerim → Sevdiklerim ve Kendim ekranlarını hatırlatan uyarı"]},
@@ -1277,6 +1278,7 @@ function iceAktarKontrol(){
       const ayni = S.assets.find(a => a.type===tip && String(a.symbol).toUpperCase()===x.s && ((a.konumNot||"")===x.y || (kripto && (a.borsaAd||"")===x.y) || (x.o && (a.konumNot||"")===x.o)));
       const mal = x.c!=null ? {cost:x.c, costTip:x.ct||"birim", costCur:x.cc||"TRY"} : {};
       if (x.p!=null) Object.assign(mal, {manualPrice:x.p, priceDate:bugun()});
+      if (x.tc) mal.tutarCur = x.tc;   // döviz fonu: takip para birimi
       const yer = kripto ? {konum:"borsa", borsaAd:x.y, konumNot:""} : {konumNot:x.y};
       if (ayni){ if (x.q!=null) ayni.qty = x.q; Object.assign(ayni, yer, mal); guncel++; }
       else { S.assets.push({id:crypto.randomUUID(), type:tip, symbol:x.s, qty:x.q, konum:"araci", ...yer, ...mal}); yeni++; }
@@ -1871,7 +1873,7 @@ function isiHaritasi(tip, l){
   for (const a of l){ const k = String(a.symbol||"").toUpperCase() || a.id; if (!m.has(k)) m.set(k, []); m.get(k).push(a); }
   let ogeler = [...m.entries()].map(([k, g]) => {
     const v = g.reduce((x,a)=>x+(degerTL(a)||0),0), a0 = g[0];
-    const ch = tip==="kripto" ? (prices.crypto[cgId(a0.symbol)]?.chU ?? prices.crypto[cgId(a0.symbol)]?.ch) : canliFiyat(a0)?.ch;
+    const ch = tip==="kripto" ? (prices.crypto[cgId(a0.symbol)]?.chU ?? prices.crypto[cgId(a0.symbol)]?.ch) : (gunlukCh(a0)?.ch ?? canliFiyat(a0)?.ch);
     const h = g.length > 1 ? gHesap({grup:g, anahtar:k}) : null, kh = g.length===1 ? kzHesap(a0) : null;
     const kz = h ? (h.oranU ?? h.oran) : kh?.oran ?? null;
     const usdT = tip==="kripto" || tip==="abd";
@@ -2282,7 +2284,7 @@ function satir(a){
   const cf = canliFiyat(a), elle = !cf && !a.hesap && ["bist","abd","fon","bes"].includes(a.type);
   return `<div class="row tap" data-detay="${esc(a.id)}">
     <div><div>${esc(etiket(a))}${a.konum==="kasa"?'<span class="tag">kasa</span>':""}</div>
-    <div class="muted">${miktar(a)}${cf?` · <span class="pos">canlı</span> ${a.type==="abd"?"$"+fN.format(cf.p):fN.format(cf.p)+" TL"}${cf.ch!=null?` <span class="${cf.ch>=0?"pos":"neg"}">${cf.ch>=0?"+":""}${cf.ch}%${(()=>{ const g = gunlukTL(a); return g!=null && !gizli ? ` (${g>=0?"+":"−"}${para(Math.abs(g))})` : ""; })()}</span>`:""}${a.type==="fon"||a.type==="bes"?" · "+esc(cf.t||""):""}`:""}${elle?` · elle fiyat${a.fiyatCur&&a.fiyatCur!=="TRY"?" ("+a.fiyatCur+")":""}${a.priceDate?" · "+esc(a.priceDate):""}`:""}${a.konum==="borsa"&&a.borsaAd?" · "+esc(a.borsaAd):""}${a.konumNot?" · "+esc(a.konumNot):""}</div></div>
+    <div class="muted">${miktar(a)}${cf?` · <span class="pos">canlı</span> ${a.type==="abd"?"$"+fN.format(cf.p):fN.format(cf.p)+" TL"}${cf.ch!=null?(()=>{ const c = gunlukCh(a) || {ch:cf.ch, pb:"TRY"}, g = gunlukTL(a); return ` <span class="${c.ch>=0?"pos":"neg"}">${c.ch>=0?"+":""}${fN.format(+c.ch.toFixed(4))}%${c.pb!=="TRY"?" ("+c.pb+")":""}${g!=null && !gizli ? ` (${g>=0?"+":"−"}${para(Math.abs(g))})` : ""}</span>`; })():""}${a.type==="fon"||a.type==="bes"?" · "+esc(cf.t||""):""}`:""}${elle?` · elle fiyat${a.fiyatCur&&a.fiyatCur!=="TRY"?" ("+a.fiyatCur+")":""}${a.priceDate?" · "+esc(a.priceDate):""}`:""}${a.konum==="borsa"&&a.borsaAd?" · "+esc(a.borsaAd):""}${a.konumNot?" · "+esc(a.konumNot):""}</div></div>
     <div class="r"><div>${para(d)}</div>${usdKarsilik(a, d)}${(()=>{ if (!(a.tutarCur&&a.tutarCur!=="TRY"&&d!=null)) return ""; const k = (cf && tcmbKur(cf.t, a.tutarCur)) || kurTL(a.tutarCur); return k ? `<div class="muted">≈ ${para(d/k, a.tutarCur==="USD"?fUSD:fEUR)}</div>` : ""; })()}${kz!=null?(false?``:`<div class="${kz>=0?"pos":"neg"}" style="font-size:13px">${gizli?"":yuzde(kz,2)+(kz>=0?" kâr":" zarar")}</div><div class="${kz>=0?"pos":"neg"}" style="font-size:12px">${gizli?"••••":(kh.tutar>=0?"+":"−")+khPara(kh)}</div>${kh.etiket?`<div class="muted" style="font-size:11px">${kh.etiket}</div>`:""}`):""}</div>
   </div>`;
 }
@@ -2336,7 +2338,8 @@ document.addEventListener("click", e => {
 /* ABD hisse/ETF maliyetleri her zaman dolar gösterilir */
 function maliyetUSD(a){ if (a.cost==null || sayi(a.cost)==null) return null; const c = sayi(a.cost), q = +a.qty||0;
   const top = a.costTip==="birim" ? c*q : c; if ((a.costCur||"TRY")==="USD") return top; const mt = maliyetTL(a), k = prices.fx.USD; return (mt!=null && k) ? mt/k : null; }
-const ortMaliyetMetni = (a, q) => { if (a.type==="abd" || (a.type==="kripto" && (a.costCur||"TRY")==="USD")){ const u = maliyetUSD(a); return (u!=null && q) ? para(u/q, fUSD2) : null; } const mt = maliyetTL(a); return (mt!=null && q) ? para(mt/q, fTL2n) : null; };
+const ortMaliyetMetni = (a, q) => { if ((a.type==="fon"||a.type==="bes") && (a.costCur||"TRY")!=="TRY" && sayi(a.cost)!=null && q){ const c = sayi(a.cost), b = a.costTip==="birim" ? c : c/q; return new Intl.NumberFormat("tr-TR",{minimumFractionDigits:6,maximumFractionDigits:6}).format(b)+" "+a.costCur; }
+  if (a.type==="abd" || (a.type==="kripto" && (a.costCur||"TRY")==="USD")){ const u = maliyetUSD(a); return (u!=null && q) ? para(u/q, fUSD2) : null; } const mt = maliyetTL(a); return (mt!=null && q) ? para(mt/q, fTL2n) : null; };
 function kurumSatir(a){
   const d = degerTL(a), kh = kzHesap(a), q = +a.qty||0, mt = maliyetTL(a);
   const birim = a.type==="fon"||a.type==="bes" ? "pay" : a.type==="altin" ? "adet/gr" : "adet";
@@ -2372,7 +2375,9 @@ function detay(){
   } else {
     ek("Miktar", `${fN.format(q)} ${birim}`);
     ek("Güncel fiyat", birimFiyat==null ? "—" : (a.type==="abd" ? fUSD2.format(birimFiyat/(kU||1)) : a.type==="kripto" && prices.crypto[cgId(a.symbol)]?.usd ? fUSD2.format(prices.crypto[cgId(a.symbol)].usd) : fTL2n.format(birimFiyat)) + (cf ? " · canlı" : " · elle"));
-    if (cf?.ch!=null){ const g = gunlukTL(a); ek("Günlük değişim", `${yuzde(cf.ch)}${g!=null?` · ${g>=0?"+":"−"}${para(Math.abs(g))}`:""}`, cf.ch>=0?"pos":"neg"); }
+    if (cf?.ch!=null){ const g = gunlukTL(a), c = gunlukCh(a) || {ch:cf.ch, pb:"TRY"};
+      ek(`Günlük değişim${c.pb!=="TRY"?" ("+c.pb+" bazında)":""}`, `${yuzde(c.ch, 4)}${g!=null?` · ${g>=0?"+":"−"}${para(Math.abs(g))}`:""}`, c.ch>=0?"pos":"neg");
+      if (c.pb!=="TRY") ek("Günlük değişim (TL bazında)", yuzde(cf.ch, 4), cf.ch>=0?"pos":"neg"); }
     else if (a.type==="kripto" && prices.crypto[cgId(a.symbol)]?.ch!=null) { const c = prices.crypto[cgId(a.symbol)].ch; ek("24 saatlik değişim", yuzde(c), c>=0?"pos":"neg"); }
     ek("Ortalama maliyet", ortMaliyetMetni(a,q) || "girilmemiş", mt==null?"muted":"");
     ek("Toplam maliyet", mt==null ? null : a.type==="abd" && maliyetUSD(a)!=null ? para(maliyetUSD(a), fUSD2) : para(mt));
@@ -2426,8 +2431,28 @@ document.addEventListener("click", e => { const b = e.target.closest("[data-kuru
   try { localStorage.setItem("kurumSec", JSON.stringify(kurumSec)); } catch {} render(); }, true);
 const kurumAdi = a => kurumAd(a) || "Diğer";
 /* Günlük kâr/zarar tutarı (TL): bugünkü değer × değişim ÷ (100 + değişim) */
+/* Döviz fonu: bankanın gösterdiği gibi fonun kendi para biriminde günlük değişim.
+   Fon döviz fiyatı = TEFAS TL fiyatı ÷ bir önceki iş gününün TCMB döviz alış kuru (bugün ve önceki fiyat günü için). */
+function dovizFonCh(a){
+  if (!(a.type==="fon"||a.type==="bes") || a.hesap) return null;
+  const pb = a.tutarCur; if (!pb || pb==="TRY") return null;
+  const cf = canliFiyat(a), t = canli?.tcmb; if (!cf || cf.ch==null || !cf.t || !t) return null;
+  const g = Object.keys(t).filter(x => x < cf.t && t[x]?.[pb]?.da).sort(); if (g.length < 2) return null;
+  const k1 = t[g[g.length-1]][pb].da, k0 = t[g[g.length-2]][pb].da;
+  return {pb, ch: ((1 + cf.ch/100) / (k1/k0) - 1) * 100, k1};
+}
+/* Gösterilecek günlük yüzde: TL dışında bir para birimi seçiliyse döviz fonları kendi para biriminde */
+function gunlukCh(a){
+  if (gosterPB!=="TRY"){ const f = dovizFonCh(a); if (f) return {ch: f.ch, pb: f.pb}; }
+  const ch = a.type==="kripto" ? prices.crypto[cgId(a.symbol)]?.ch : canliFiyat(a)?.ch;
+  return ch==null ? null : {ch: +ch, pb: "TRY"};
+}
 function gunlukTL(a){
   const d = degerTL(a); if (!d || isBA(a) || a.odendi) return null;
+  if (gosterPB!=="TRY"){   // döviz fonu: değişim fonun döviz fiyatından; TL karşılığı bugünkü kurla (ekranda seçili para birimine çevrilir)
+    const f = dovizFonCh(a), cf = f && canliFiyat(a);
+    if (f && cf){ const vFx = cf.p / f.k1 * (+a.qty||0), k = kurTL(f.pb); if (k) return vFx * f.ch / (100 + f.ch) * k; }
+  }
   const C = prices.ch || {};
   let ch;
   if (a.type==="kripto") ch = prices.crypto[cgId(a.symbol)]?.ch;
