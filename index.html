@@ -227,8 +227,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 76; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 77; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:77, t:"2026-11-16", n:["BES: AgeSA ekran görüntülerini uygulamadan seçin — tutarlar telefonda otomatik okunur, sözleşme numarasıyla eşleşir, AgeSA toplamıyla kontrol edilir; önizlemeden sonra tek dokunuşla güncellenir"]},
   {s:76, t:"2026-11-13", n:["Döviz fonlarında günlük değişim, bankadaki gibi fonun kendi para biriminde (USD/EUR; TCMB kuruyla) — USD/EUR seçiliyken satır, detay, kareler ve Bugün toplamında"]},
   {s:75, t:"2026-11-12", n:["Özet: \"Bugün\" satırına dokununca bugünkü kâr/zararın dağılımı — varlık türüne göre tutar ve yüzde, en çok kazandıran ve kaybettiren 5 kalem"]},
   {s:74, t:"2026-11-11", n:["Özet: net varlığın altında bugünkü kâr/zarar tutarı ve yüzdesi (hisse, fon, kripto, altın, gümüş, döviz ve BES)"]},
@@ -1807,6 +1808,7 @@ function besDetay(a){
   ${F.length?`<h2>Fon dağılımı · ${F.length} fon</h2><div class="card">${F.map(fonSatir).join("")}
     ${B.kapsam?`<p class="muted" style="font-size:11px;margin:8px 0 0">Fon kodları TEFAS'ta bulunanların değeri, ekran tarihinden bu yana fon fiyatındaki değişimle güncellenir (%${fN2.format(B.kapsam*100)}'i). Kesin tutar için haftalık ekran görüntüsü yeterli.</p>`:""}</div>`:""}
   ${gun!=null && gun>=7 ? `<div class="card" style="border-color:var(--neg)"><b>📸 Güncelleme zamanı</b><p class="muted" style="margin:4px 0 0">Bu hesabın son ekranı ${gun} gün önce. Güncel ekran görüntüsünü Claude'a gönderin.</p></div>` : ""}
+  <button class="btn ghost" data-besocr="1">📸 Ekran görüntüsünden güncelle</button>
   <button class="btn" data-edit="${esc(a.id)}">Düzenle</button>
   <button class="btn danger" data-act="detaySil">Sil</button>`;
 }
@@ -1827,7 +1829,8 @@ function besUyari(){
   const kisi = {}; for (const x of eski){ const k = x.a.kisi||"—"; kisi[k] = Math.max(kisi[k]||0, x.g); }
   const sirket = [...new Set(bes.map(a=>a.sirket).filter(Boolean))].join(" / ") || "Emeklilik şirketinizin";
   return `<div class="card tap" data-kat="bes" style="border-color:#f08c00;background:rgba(240,140,0,.09)"><b>📸 Haftalık BES güncellemesi zamanı</b>
-    <p style="margin:6px 0 0">${esc(sirket)} uygulamasında <b>Birikimlerim → Sevdiklerim</b> ve <b>Kendim</b> ekranlarının güncel görüntülerini Birikimlerim sohbetinde Claude'a gönderin; değerler içe aktarma bağlantısıyla yüklenir.</p>
+    <p style="margin:6px 0 0">${esc(sirket)} uygulamasında <b>Birikimlerim → Sevdiklerim</b> ve <b>Kendim</b> ekranlarının görüntüsünü alın, buradan seçin; tutarlar otomatik okunur.</p>
+    <button class="btn" data-besocr="1" style="margin-top:8px">📸 Ekran görüntülerini seç</button>
     <p class="muted" style="margin:6px 0 0;font-size:13px">${eski.length}/${bes.length} sözleşme eski · ${Object.entries(kisi).map(([k,g])=>`${esc(k)}: ${g} gün önce`).join(" · ")}</p></div>`;
 }
 
@@ -1979,6 +1982,75 @@ document.addEventListener("change", async e => {
   if (!confirm(`"${eski}" adındaki ${l.length} kayıt "${yeni}" olarak değiştirilsin mi?`)){ sl.value = ""; return; }
   for (const a of l) a.konumNot = yeni; const b = mukerrerBirlestir(); render(); await kaydet(); toast("Birleştirildi" + (b ? ` · ${b} mükerrer kayıt tek kayda indi` : ""));
 });
+/* ============ BES ekran görüntüsünden güncelleme (yazı tanıma telefonda; görüntü hiçbir yere gönderilmez) ============ */
+let besOcr = null;   // {durum, ilerleme, sonuc:[{no, tutar, a}], tanimsiz:[], toplam, hata}
+function besTutar(x){ const m = String(x).match(/(\d{1,3}(?:[.,]\d{3})+)[.,](\d{2})/); return m ? +(m[1].replace(/[.,]/g,"") + "." + m[2]) : null; }
+function besMetinCoz(metin){   // her sözleşme no'su, kendinden önceki en yakın tutarla eşleşir (kartta tutar üstte, no altta)
+  const satirlar = String(metin).split(/\n+/).map(s=>s.trim()).filter(Boolean), tutarlar = [], nolar = [];
+  const tRe = /(\d{1,3}(?:[.,]\d{3})+[.,]\d{2})\s*T/i, nRe = /\b([A-Z][0-9]{6})\b/;
+  satirlar.forEach((s, i) => { const t = s.match(tRe); if (t) tutarlar.push({i, v: besTutar(t[1])}); const n = s.match(nRe); if (n) nolar.push({i, no: n[1]}); });
+  const sonuc = nolar.map(n => { const ust = tutarlar.filter(t=>t.i < n.i); return {no: n.no, tutar: ust.length ? ust[ust.length-1].v : null}; });
+  const ilkNo = nolar.length ? nolar[0].i : Infinity, bas = tutarlar.filter(t=>t.i < ilkNo);
+  const toplam = bas.length > 1 || (bas.length===1 && !sonuc.some(x=>x.tutar===bas[0].v)) ? bas[0].v : null;   // üstteki "Toplam Birikim"
+  return {sonuc, toplam};
+}
+function tesseractYukle(){
+  if (window.Tesseract) return Promise.resolve();
+  return new Promise((ok, hata) => { const s = document.createElement("script"); s.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"; s.onload = ok; s.onerror = () => hata(new Error("Yazı tanıma yüklenemedi (internet bağlantısını kontrol edin)")); document.head.appendChild(s); });
+}
+async function besOcrBasla(dosyalar){
+  if (!dosyalar?.length) return;
+  besOcr = {durum:"okunuyor", ilerleme:`Yazı tanıma hazırlanıyor…`, sonuc:[], tanimsiz:[], toplam:null}; besOcrCiz();
+  try {
+    await tesseractYukle();
+    const w = await Tesseract.createWorker("eng");
+    const bulunan = new Map(); let toplam = null;
+    for (let i = 0; i < dosyalar.length; i++){
+      besOcr.ilerleme = `Görüntü okunuyor ${i+1}/${dosyalar.length}…`; besOcrCiz();
+      const { data } = await w.recognize(dosyalar[i]);
+      const r = besMetinCoz(data.text);
+      for (const x of r.sonuc) if (x.tutar!=null && !bulunan.has(x.no)) bulunan.set(x.no, x.tutar);
+      if (r.toplam!=null) toplam = r.toplam;
+    }
+    await w.terminate();
+    const kayit = S.assets.filter(a=>a.type==="bes" && a.hesap);
+    besOcr.sonuc = [...bulunan].map(([no, tutar]) => ({no, tutar, a: kayit.find(a=>String(a.sozNo||"").toUpperCase()===no)}));
+    besOcr.toplam = toplam; besOcr.durum = besOcr.sonuc.length ? "hazir" : "bos";
+  } catch(e){ besOcr.durum = "hata"; besOcr.hata = e?.message || String(e); }
+  besOcrCiz();
+}
+function besOcrCiz(){
+  let w = document.getElementById("besOcrPencere");
+  if (!besOcr){ w?.remove(); return; }
+  if (!w){ w = document.createElement("div"); w.id = "besOcrPencere"; w.className = "gp"; document.body.appendChild(w); }
+  const O = besOcr, eslesen = O.sonuc.filter(x=>x.a), yeni = O.sonuc.filter(x=>!x.a);
+  const top = O.sonuc.reduce((x,y)=>x+y.tutar,0), tutuyor = O.toplam!=null && Math.abs(O.toplam - top) < 0.05;
+  const govde = O.durum==="okunuyor" ? `<p class="muted" style="margin:16px 0">⏳ ${esc(O.ilerleme)}</p><p class="muted" style="font-size:12px">Yazı tanıma telefonunuzda çalışır; görüntüler hiçbir yere gönderilmez. İlk seferde ~10 MB indirilir.</p>`
+    : O.durum==="hata" ? `<p class="neg">${esc(O.hata)}</p>`
+    : O.durum==="bos" ? `<p class="muted">Görüntülerde sözleşme numarası ve tutar bulunamadı. AgeSA'da <b>Birikimlerim → Sevdiklerim / Kendim</b> listesinin görüntüsünü seçin.</p>`
+    : `${O.toplam!=null ? `<div class="${tutuyor?"pos":"neg"}" style="margin:4px 0 8px;font-weight:600">${tutuyor ? "✓ Toplam AgeSA ile tutuyor" : "⚠ Toplam tutmuyor — eksik görüntü olabilir"} · ${fTL2n.format(top)}${tutuyor?"":" / "+fTL2n.format(O.toplam)}</div>` : ""}
+      ${eslesen.map(x => { const e = sayi(x.a.toplam) || 0, f = x.tutar - e; return `<div class="row" style="padding:8px 0"><div><b>${esc(x.a.kisi||"")}</b><div class="muted" style="font-size:12px">${esc(x.no)} · eski ${fTL2n.format(e)}</div></div>
+        <div class="r"><b>${fTL2n.format(x.tutar)}</b><div class="${f>=0?"pos":"neg"}" style="font-size:12px">${f>=0?"+":"−"}${fTL2n.format(Math.abs(f))}</div></div></div>`; }).join("")}
+      ${yeni.length ? `<p class="muted" style="font-size:12px;margin:8px 0 0">Uygulamada kaydı olmayan sözleşme: ${yeni.map(x=>`${esc(x.no)} (${fTL2n.format(x.tutar)})`).join(", ")} — eklemek için Claude'a yazın.</p>` : ""}
+      ${eslesen.length ? `<button class="btn" data-bocr="kaydet">${eslesen.length} sözleşmeyi güncelle</button>` : ""}`;
+  w.innerHTML = `<div class="gp-kart" role="dialog" aria-label="BES güncelle"><div class="gp-ust"><b style="flex:1">📸 BES ekran görüntüsünden güncelle</b><button class="iconbtn" data-bocr="kapat" aria-label="Kapat">✕</button></div>${govde}</div>`;
+}
+document.addEventListener("click", async e => {
+  if (e.target.closest("[data-besocr]")){ e.stopPropagation(); e.preventDefault();
+    let i = document.getElementById("besDosya");
+    if (!i){ i = document.createElement("input"); i.type = "file"; i.accept = "image/*"; i.multiple = true; i.id = "besDosya"; i.style.display = "none"; document.body.appendChild(i);
+      i.addEventListener("change", () => { const f = [...i.files]; i.value = ""; besOcrBasla(f); }); }
+    i.click(); return; }
+  const b = e.target.closest("[data-bocr]"); if (!b) return; e.stopPropagation();
+  if (b.dataset.bocr==="kapat"){ besOcr = null; besOcrCiz(); return; }
+  if (b.dataset.bocr==="kaydet"){
+    let n = 0;
+    for (const x of besOcr.sonuc.filter(x=>x.a)){ const a = x.a, eski = sayi(a.toplam);
+      if (a.fonlar?.length && eski) a.fonlar = a.fonlar.map(f=>({...f, tutar:(sayi(f.tutar)||0)*x.tutar/eski, p0:null, p0t:null}));   // dağılım oranı korunur
+      a.toplam = x.tutar; a.tarih = bugun(); n++; }
+    besOcr = null; besOcrCiz(); filtre = "bes"; tab = "varlik"; render(); await kaydet(); toast(`${n} BES sözleşmesi güncellendi`);
+  }
+}, true);
 function kivilcim(seri, yon){
   if (!seri || seri.length < 3) return "";
   const mn = Math.min(...seri), mx = Math.max(...seri), rg = (mx-mn) || 1, W=160, H=48;
@@ -2526,9 +2598,10 @@ function varliklar(){
   return ust + sir + Object.keys(TYPES).filter(k=>k!=="alacak"&&k!=="borc"&&(!filtre||k===filtre)).map(k=>{
     const l = S.assets.filter(a=>a.type===k); if (!l.length) return "";
     const usdT = (k==="kripto"||k==="abd") ? l.reduce((x,a)=>x+(usdDeger(a)||0),0) : 0;
+    const besDugme = k==="bes" && l.some(a=>a.hesap) ? `<button class="btn ghost" data-besocr="1" style="margin:0 0 10px">📸 Ekran görüntüsünden güncelle</button>` : "";
     const ks = KURUM_TIPLER.includes(k) ? kurumListe(k, l) : l, gT = KURUM_TIPLER.includes(k) || k==="bes" ? gunlukTop(ks) : null;
     const bugunSatir = gT==null ? "" : `<div class="muted" style="font-size:13px;margin:-4px 2px 8px">Bugün: <b class="${gT>=0?"pos":"neg"}">${gizli?"••••":(gT>=0?"+":"−")+para(Math.abs(gT))}</b>${(()=>{ const v = toplam(ks).v; return v && !gizli ? ` <span class="${gT>=0?"pos":"neg"}">(${yuzde(gT/(v-gT)*100,2)})</span>` : ""; })()}</div>`;
-    return `<h2>${TYPES[k].ad} · ${para(toplam(l).v)}${usdT?` · ${para(usdT, fUSD)}`:""}</h2>${bugunSatir}${KURUM_TIPLER.includes(k) ? kurumOzet(k, l) : ""}${filtre===k && KURUM_TIPLER.includes(k) ? isiAlan(k, l, ks) : ""}<div class="card">${siraliListe(grupla(ks)).map(gSatir).join("")}</div>${k==="bist"?bistOzet(ks):""}`;
+    return `<h2>${TYPES[k].ad} · ${para(toplam(l).v)}${usdT?` · ${para(usdT, fUSD)}`:""}</h2>${bugunSatir}${besDugme}${KURUM_TIPLER.includes(k) ? kurumOzet(k, l) : ""}${filtre===k && KURUM_TIPLER.includes(k) ? isiAlan(k, l, ks) : ""}<div class="card">${siraliListe(grupla(ks)).map(gSatir).join("")}</div>${k==="bist"?bistOzet(ks):""}`;
   }).join("");
 }
 /* BIST endeks üyeliği — Ekim–Aralık 2026 dönemi (her çeyrek güncellenir) */
