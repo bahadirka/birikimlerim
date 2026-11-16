@@ -227,8 +227,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 77; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 78; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:78, t:"2026-11-16", n:["Bugünkü kâr/zarar USD/EUR seçiliyken gerçekten o para birimi cinsinden: dolar nakit dolar görünümünde değişmez, TL ve euro nakit kur hareketi kadar değişir; hisse, fon, altın da kur etkisi ayrılarak hesaplanır"]},
   {s:77, t:"2026-11-16", n:["BES: AgeSA ekran görüntülerini uygulamadan seçin — tutarlar telefonda otomatik okunur, sözleşme numarasıyla eşleşir, AgeSA toplamıyla kontrol edilir; önizlemeden sonra tek dokunuşla güncellenir"]},
   {s:76, t:"2026-11-13", n:["Döviz fonlarında günlük değişim, bankadaki gibi fonun kendi para biriminde (USD/EUR; TCMB kuruyla) — USD/EUR seçiliyken satır, detay, kareler ve Bugün toplamında"]},
   {s:75, t:"2026-11-12", n:["Özet: \"Bugün\" satırına dokununca bugünkü kâr/zararın dağılımı — varlık türüne göre tutar ve yüzde, en çok kazandıran ve kaybettiren 5 kalem"]},
@@ -2536,7 +2537,15 @@ function gunlukTL(a){
     ch = w ? t/w : null; }
   else if (a.type==="mevduat") ch = null;
   else ch = canliFiyat(a)?.ch;
-  return ch==null ? null : d * ch / (100 + +ch);
+  if (ch==null) return null;
+  /* Seçili para birimi USD/EUR ise değişim o para birimi cinsinden: (1 + TL değişimi) ÷ (1 + kurun TL değişimi) − 1.
+     Böylece ör. USD nakit USD görünümünde 0, TL nakit ise doların TL karşısındaki hareketi kadar değişir. */
+  if (gosterPB!=="TRY"){
+    if (a.type==="kripto" && gosterPB==="USD" && prices.crypto[cgId(a.symbol)]?.chU!=null) ch = prices.crypto[cgId(a.symbol)].chU;
+    else if (a.type==="nakit" && a.cur===gosterPB) ch = 0;
+    else { const k = C[gosterPB]; if (k!=null) ch = ((1 + ch/100) / (1 + k/100) - 1) * 100; }
+  }
+  return d * ch / (100 + +ch);
 }
 /* Bugünkü kâr/zararın kaynakları: varlık türü bazında ve en çok etkileyen kalemler */
 let bugunAcik = false;
