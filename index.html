@@ -229,8 +229,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 79; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 80; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:80, t:"2026-11-18", n:["İçe aktarma bağlantısı uygulama zaten açıkken de çalışır (\"Portföye eklensin mi?\" penceresi hemen açılır)"]},
   {s:79, t:"2026-11-18", n:["Hesap sahibi: kayıtlara kimin hesabı olduğu eklenebilir (👤 Ieva Kargılı gibi); aynı fon farklı kişilerdeyse ayrı tutulur","İçe aktarma bağlantısı vadeli mevduatı da destekler"]},
   {s:78, t:"2026-11-16", n:["Bugünkü kâr/zarar USD/EUR seçiliyken gerçekten o para birimi cinsinden: dolar nakit dolar görünümünde değişmez, TL ve euro nakit kur hareketi kadar değişir; hisse, fon, altın da kur etkisi ayrılarak hesaplanır"]},
   {s:77, t:"2026-11-16", n:["BES: AgeSA ekran görüntülerini uygulamadan seçin — tutarlar telefonda otomatik okunur, sözleşme numarasıyla eşleşir, AgeSA toplamıyla kontrol edilir; önizlemeden sonra tek dokunuşla güncellenir"]},
@@ -1245,9 +1246,13 @@ document.addEventListener("submit", e => {
 
 /* ============ İçe aktarma bağlantısı (#ice=...) ============
    Bağlantıdaki liste sunucuya gitmez (# sonrası tarayıcıda kalır); onaylanınca şifreli kasaya eklenir. */
-let iceBekleyen = (() => { try { const m = location.hash.match(/#ice=([A-Za-z0-9_-]+)/); if (!m) return null;
+const iceOku = () => { try { const m = location.hash.match(/#ice=([A-Za-z0-9_-]+)/); if (!m) return null;
   const b = m[1].replace(/-/g,"+").replace(/_/g,"/"); const j = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b), c=>c.charCodeAt(0))));
-  return Array.isArray(j.a) ? j : null; } catch { return null; } })();
+  return Array.isArray(j.a) ? j : null; } catch { return null; } };
+let iceBekleyen = iceOku();
+/* Uygulama zaten açıkken bağlantıya dokunulursa sayfa yenilenmez, yalnız adres sonu değişir: onu da yakala */
+window.addEventListener("hashchange", () => { const j = iceOku(); if (!j) return; document.getElementById("icePencere")?.remove(); iceBekleyen = j;
+  if (screen==="app" && S) iceAktarKontrol(); else toast("Kasayı açınca eklenecek kalemler gösterilecek"); });
 function iceAktarKontrol(){
   if (!iceBekleyen || demo || !S) return;
   const L = iceBekleyen.a, ad = x => ((x.t==="fon"||x.t==="bes") ? canli?.fon?.[x.s]?.ad : x.t==="kripto" ? "" : canli?.adlar?.[x.t||"bist"]?.[x.s]) || (x.t==="kripto" ? "" : x.s);
