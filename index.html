@@ -229,8 +229,9 @@ const CFG = {
   appId: "1:743195441381:web:c86b94de22c43fcd9b7c0c"
 };
 const CONFIGURED = !CFG.apiKey.startsWith("BURAYA");
-const SURUM = 80; // her güncellemede artırılır (version.json ile aynı)
+const SURUM = 81; // her güncellemede artırılır (version.json ile aynı)
 const SURUM_NOTLARI = [
+  {s:81, t:"2026-11-18", n:["Ekle ekranında \"🔗 Panodan yapıştır ve ekle\": Claude'un gönderdiği bağlantıyı ana ekrandaki uygulamada doğrudan ekleyin (Safari'ye gerek yok)"]},
   {s:80, t:"2026-11-18", n:["İçe aktarma bağlantısı uygulama zaten açıkken de çalışır (\"Portföye eklensin mi?\" penceresi hemen açılır)"]},
   {s:79, t:"2026-11-18", n:["Hesap sahibi: kayıtlara kimin hesabı olduğu eklenebilir (👤 Ieva Kargılı gibi); aynı fon farklı kişilerdeyse ayrı tutulur","İçe aktarma bağlantısı vadeli mevduatı da destekler"]},
   {s:78, t:"2026-11-16", n:["Bugünkü kâr/zarar USD/EUR seçiliyken gerçekten o para birimi cinsinden: dolar nakit dolar görünümünde değişmez, TL ve euro nakit kur hareketi kadar değişir; hisse, fon, altın da kur etkisi ayrılarak hesaplanır"]},
@@ -1246,7 +1247,7 @@ document.addEventListener("submit", e => {
 
 /* ============ İçe aktarma bağlantısı (#ice=...) ============
    Bağlantıdaki liste sunucuya gitmez (# sonrası tarayıcıda kalır); onaylanınca şifreli kasaya eklenir. */
-const iceOku = () => { try { const m = location.hash.match(/#ice=([A-Za-z0-9_-]+)/); if (!m) return null;
+const iceOku = (kaynak) => { try { const m = String(kaynak ?? location.hash).match(/(?:#ice=|^\s*)([A-Za-z0-9_-]{20,})\s*$/) || String(kaynak ?? location.hash).match(/#ice=([A-Za-z0-9_-]+)/); if (!m) return null;
   const b = m[1].replace(/-/g,"+").replace(/_/g,"/"); const j = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b), c=>c.charCodeAt(0))));
   return Array.isArray(j.a) ? j : null; } catch { return null; } };
 let iceBekleyen = iceOku();
@@ -2799,7 +2800,11 @@ function form(){
       <label>Not (ör. "kredi kartı", "elden verildi")</label><input name="not" value="${v("not")}">`; break;
   }
   const ba = isBA(a) || a.type==="mevduat" || (a.type==="bes" && a.hesap);
-  return `<div class="card"><form id="f" autocomplete="off">
+  const yapistir = a.id ? "" : `<div class="card"><b>🔗 Claude'un gönderdiği bağlantı</b>
+    <p class="muted" style="margin:4px 0 8px;font-size:13px">Ana ekrandaki uygulamada bağlantılar Safari'de açılır. Bağlantıyı sohbetten kopyalayıp burada yapıştırın.</p>
+    <button class="btn ghost" data-act="iceYapistir" style="margin:0">Panodan yapıştır ve ekle</button>
+    <div id="iceElle" style="display:none;margin-top:8px"><input id="iceMetin" placeholder="https://bahadirka.github.io/birikimlerim/#ice=…" autocapitalize="off" autocorrect="off"><button class="btn" data-act="iceElleEkle">Ekle</button></div></div>`;
+  return `${yapistir}<div class="card"><form id="f" autocomplete="off">
     <label>Tür</label>${sel("type",Object.fromEntries(Object.entries(TYPES).map(([k,t])=>[k,t.ad])),a.type)}
     ${ozel}
     ${ba?"":`<label>Nerede duruyor?</label>${sel("konum",KONUM,a.konum)}
@@ -2904,6 +2909,13 @@ document.addEventListener("click", async e => {
     if (act==="alacakHerZaman"){ lsSet("alacakHerZaman", alacakHerZaman() ? "0" : "1"); toast(alacakHerZaman() ? "Açık alacaklar her açılışta gösterilecek" : "Yalnız pazartesi ve vadesi geçince"); render(); return; }
     if (act==="bildirimDene"){ denemeBildirim(); return; }
     if (act==="takvimHatirlat"){ takvimHatirlatma(); return; }
+    if (act==="iceYapistir" || act==="iceElleEkle"){
+      let metin = act==="iceElleEkle" ? document.getElementById("iceMetin")?.value : null;
+      if (act==="iceYapistir"){ try { metin = await navigator.clipboard.readText(); } catch { metin = null; } }
+      const j = metin ? iceOku(metin.trim()) : null;
+      if (!j){ const k = document.getElementById("iceElle"); if (k){ k.style.display = "block"; document.getElementById("iceMetin")?.focus(); }
+        toast(metin ? "Bu metin bir içe aktarma bağlantısı değil" : "Bağlantıyı aşağıdaki kutuya yapıştırın"); return; }
+      iceBekleyen = j; document.getElementById("icePencere")?.remove(); iceAktarKontrol(); return; }
     if (act==="bugunAc"){ bugunAcik = !bugunAcik; render(); return; }
     if (act==="kilitle") kilitle();
     if (act==="gizle"){ gizli=!gizli; lsSet("gizle",gizli?"1":"0"); render(); }
